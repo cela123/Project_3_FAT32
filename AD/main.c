@@ -11,11 +11,13 @@ char *get_input(void);
 int main(){
 
     while(1){
-    char* input = get_input();
-    if(strcmp(input, "exit") == 0)
-        break; 
+        char* input = get_input();
+        if(strcmp(input, "exit") == 0){
+            free(input);
+            break; 
+        }
     }
-
+    
     return 0; 
 }
 
