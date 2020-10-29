@@ -29,10 +29,9 @@ int main(){
 }
 
 void info(int bps, int spc, int rsc, int noF, int totS, int szF, int rc){
-  //  char* test = "bytes per sector: %d\nsectors per cluster: %d\nreseverd sector count: %d\nnumber of FATs: %d\ntotal sectors: %d\nFATsize: %d\nroot cluster: %d\n"; 
+
     printf("bytes per sector: %d\nsectors per cluster: %d\nreseverd sector count: %d\nnumber of FATs: %d\ntotal sectors: %d\nFATsize: %d\nroot cluster: %d\n", bps, spc, rsc, noF, totS, szF, rc);
-   // char* infoStr = sprintf( "bytes per sector: %d\nsectors per cluster: %d\nreseverd sector count: %d\nnumber of FATs: %d\ntotal sectors: %d\nFATsize: %d\nroot cluster: %d\n", bps, spc, rsc, noF, totS, szF, rc); 
-   // return infoStr
+
 }
 
 char *get_input(void)
