@@ -13,6 +13,7 @@ char *get_input(void);
 int main(){
 
     while(1){
+        printf("$ ");
         char* input = get_input();
 
         if(strcmp(input, "exit") == 0){
