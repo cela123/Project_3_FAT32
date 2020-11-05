@@ -7,12 +7,18 @@
 #include <fcntl.h>
 #include "parser.h"
 
-void info(int, int, int, int, int, int, int);
+void print_info(int, int, int, int, int, int, int);
 
 
 int main(){
 
+    int fd = open("fat32.img", O_RDONLY);
+
+    if (fd == -1)
+        printf("Error opening file");
+
     while(1){
+
         printf("$ ");
         char* input = get_input();
 		tokenlist *inputTokens = get_tokens(input);
@@ -23,14 +29,14 @@ int main(){
         }
         if(strcmp(inputTokens->items[0], "info") == 0){
 
-            info(1,2,3,4,5,6,7); 
+            print_info(1,2,3,4,5,6,7); 
         }
     }
     
     return 0; 
 }
 
-void info(int bps, int spc, int rsc, int noF, int totS, int szF, int rc){
+void print_info(int bps, int spc, int rsc, int noF, int totS, int szF, int rc){
 
     printf("bytes per sector: %d\nsectors per cluster: %d\nreseverd sector count: %d\nnumber of FATs: %d\ntotal sectors: %d\nFATsize: %d\nroot cluster: %d\n", bps, spc, rsc, noF, totS, szF, rc);
 
