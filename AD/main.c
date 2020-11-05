@@ -17,8 +17,11 @@ int main(){
     int bps, spc, rsc, noF, totS, szF, rc;
     bps = 0; 
     spc = 0; 
+    rsc = 0; 
     noF = 0; 
     totS = 0; 
+    szF = 0; 
+    rc = 0; 
     off_t temp; 
     ssize_t temp2; 
     int fd = open("fat32.img", O_RDONLY);
