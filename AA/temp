@@ -1,0 +1,16 @@
+/*
+• Bytes per sector (BPB_BytsPerSec)
+• Sectors per cluster (BPB_SecPerClus)
+• Reserved region size (BPB_RsvdSecCnt)
+• Number of FATs (BPB_NumFATs)
+• FAT size (BPB_FATSz32)
+• Root cluster (BPB_RootClus)
+• Total sectors (BPB_TotSec32)
+*/
+
+typedef struct bpb_info_struct
+{
+  unsigned short bpb_bytspersec, bpb_secperclus,
+                bpb_rsvdseccnt, bpb_numfats;
+  unsigned int bpb_fatsz32, bpb_rootclus, bpb_totsec32;
+}Bpb_info_struct;
