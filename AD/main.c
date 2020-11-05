@@ -31,24 +31,17 @@ int main(){
         printf("Error opening file");
 
     temp = lseek(fd, 11, SEEK_CUR);
-
     temp2 = read(fd, &bps, 2); 
-
     temp2 = read(fd, &spc, 1); 
-
     temp2 = read(fd, &rsc, 2); 
-
     temp2 = read(fd, &noF, 2); 
-
     temp = lseek(fd, 14, SEEK_CUR);
     temp2 = read(fd, &totS, 4); 
-
     temp2 = read(fd, &szF, 4); 
-
     temp = lseek(fd, 4, SEEK_CUR);
     temp2 = read(fd, &rc, 4);   
 
-    print_info(bps,spc,rsc,noF,totS,szF,rc); 
+    
     while(1){
 
         printf("$ ");
@@ -61,7 +54,7 @@ int main(){
         }
         if(strcmp(inputTokens->items[0], "info") == 0){
 
-            print_info(1,2,3,4,5,6,7); 
+            print_info(bps,spc,rsc,noF,totS,szF,rc); 
         }
     }
 
