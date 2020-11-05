@@ -14,7 +14,11 @@ void print_info(int, int, int, int, int, int, int);
 
 int main(){
 
-    int bps, spc, rsc; 
+    int bps, spc, rsc, noF, totS, szF, rc;
+    bps = 0; 
+    spc = 0; 
+    noF = 0; 
+    totS = 0; 
     off_t temp; 
     ssize_t temp2; 
     int fd = open("fat32.img", O_RDONLY);
@@ -26,13 +30,22 @@ int main(){
     temp = lseek(fd, 11, SEEK_CUR);
 
     temp2 = read(fd, &bps, 2); 
-    printf("bps = %d\n", bps); 
 
-
-    temp = lseek(fd, 0, SEEK_CUR);
     temp2 = read(fd, &spc, 1); 
-    printf("spc = %d\n", spc); 
 
+    temp2 = read(fd, &rsc, 2); 
+
+    temp2 = read(fd, &noF, 2); 
+
+    temp = lseek(fd, 14, SEEK_CUR);
+    temp2 = read(fd, &totS, 4); 
+
+    temp2 = read(fd, &szF, 4); 
+
+    temp = lseek(fd, 4, SEEK_CUR);
+    temp2 = read(fd, &rc, 4);   
+
+    print_info(bps,spc,rsc,noF,totS,szF,rc); 
     while(1){
 
         printf("$ ");
@@ -55,7 +68,7 @@ int main(){
 
 void print_info(int bps, int spc, int rsc, int noF, int totS, int szF, int rc){
 
-    printf("bytes per sector: %d\nsectors per cluster: %d\nreseverd sector count: %d\nnumber of FATs: %d\ntotal sectors: %d\nFATsize: %d\nroot cluster: %d\n", bps, spc, rsc, noF, totS, szF, rc);
+    printf("bytes per sector: %d\nsectors per cluster: %d\nreserved sector count: %d\nnumber of FATs: %d\ntotal sectors: %d\nFATsize: %d\nroot cluster: %d\n", bps, spc, rsc, noF, totS, szF, rc);
 
 }
 
