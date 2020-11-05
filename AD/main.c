@@ -14,17 +14,24 @@ void print_info(int, int, int, int, int, int, int);
 
 int main(){
 
-    int bps; 
+    int bps, spc, rsc; 
+    off_t temp; 
+    ssize_t temp2; 
     int fd = open("fat32.img", O_RDONLY);
     
    
     if (fd == -1)
         printf("Error opening file");
 
-    lseek(fd, 11, SEEK_CUR);
+    temp = lseek(fd, 11, SEEK_CUR);
 
-    read(fd, bps, 2); 
+    temp2 = read(fd, &bps, 2); 
     printf("bps = %d\n", bps); 
+
+
+    temp = lseek(fd, 0, SEEK_CUR);
+    temp2 = read(fd, &spc, 1); 
+    printf("spc = %d\n", spc); 
 
     while(1){
 
