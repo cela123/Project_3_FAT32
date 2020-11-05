@@ -4,7 +4,9 @@
 #include <string.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <sys/types.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include "parser.h"
 
 void print_info(int, int, int, int, int, int, int);
@@ -12,10 +14,17 @@ void print_info(int, int, int, int, int, int, int);
 
 int main(){
 
+    int bps; 
     int fd = open("fat32.img", O_RDONLY);
-
+    
+   
     if (fd == -1)
         printf("Error opening file");
+
+    lseek(fd, 11, SEEK_CUR);
+
+    read(fd, bps, 2); 
+    printf("bps = %d\n", bps); 
 
     while(1){
 
@@ -32,7 +41,8 @@ int main(){
             print_info(1,2,3,4,5,6,7); 
         }
     }
-    
+
+    close(fd); 
     return 0; 
 }
 
