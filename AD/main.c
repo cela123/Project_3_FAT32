@@ -73,12 +73,21 @@ int main(){
             print_info(bps,spc,rsc,noF,totS,szF,rc); 
         }
         if(strcmp(inputTokens->items[0], "ls") == 0){
+            int directory; 
+            if(inputTokens->items[1]!= NULL){
+                //determine start of directory specified
+            }
+            else{
+                directory = currDirectory; 
+            }
+            
+
             int n = 32; 
-            temp = lseek(fd, currDirectory, SEEK_SET);
+            temp = lseek(fd, directory, SEEK_SET);
             temp2 = read(fd, &empty, 4); 
             while(empty != 0){
                 //printf("Empty = %d\n", empty); 
-                temp = lseek(fd, currDirectory+n, SEEK_SET);
+                temp = lseek(fd, directory+n, SEEK_SET);
                 
                 for(i=0; i<11; i++){
                 temp2 = read(fd, &fileName[i], 1);
