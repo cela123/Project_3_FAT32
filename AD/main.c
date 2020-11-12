@@ -23,10 +23,20 @@ int main(){
     szF = 0; 
     rc = 0; 
     off_t temp; 
-    ssize_t temp2; 
+    ssize_t temp2;
+
+    int dataRegStart; 
+    int test; 
+    int i; 
+    char fileName[11]; 
+    int empty =0; 
+
+    
+
     int fd = open("fat32.img", O_RDONLY);
     
-   
+    int currDirectory;
+
     if (fd == -1)
         printf("Error opening file");
 
@@ -41,7 +51,13 @@ int main(){
     temp = lseek(fd, 4, SEEK_CUR);
     temp2 = read(fd, &rc, 4);   
 
-    
+
+    dataRegStart = bps*(rsc + (noF*szF)); 
+    //set current directory to the beginning of data region intially (ie start in root)
+    currDirectory = dataRegStart; 
+    printf("Data Region Start = %d\n", dataRegStart); 
+
+
     while(1){
 
         printf("$ ");
@@ -55,6 +71,25 @@ int main(){
         if(strcmp(inputTokens->items[0], "info") == 0){
 
             print_info(bps,spc,rsc,noF,totS,szF,rc); 
+        }
+        if(strcmp(inputTokens->items[0], "ls") == 0){
+            int n = 32; 
+            temp = lseek(fd, currDirectory, SEEK_SET);
+            temp2 = read(fd, &empty, 4); 
+            while(empty != 0){
+                //printf("Empty = %d\n", empty); 
+                temp = lseek(fd, currDirectory+n, SEEK_SET);
+                
+                for(i=0; i<11; i++){
+                temp2 = read(fd, &fileName[i], 1);
+            
+                }
+                printf("%s\n", fileName); 
+
+                temp = lseek(fd, 21, SEEK_CUR);
+                temp2 = read(fd, &empty, 4); 
+                n+=64; 
+            }
         }
     }
 
