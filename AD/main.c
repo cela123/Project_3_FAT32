@@ -10,7 +10,7 @@
 #include "parser.h"
 
 void print_info(int, int, int, int, int, int, int);
-
+int dirLocation(int fd, char dirName[11], int curDir, int firstDataLoc, int spc); 
 
 int main(){
 
@@ -73,12 +73,29 @@ int main(){
             print_info(bps,spc,rsc,noF,totS,szF,rc); 
         }
         if(strcmp(inputTokens->items[0], "ls") == 0){
+            int directory; 
+            if(inputTokens->items[1]!= NULL){
+                //determine start of directory specified
+                printf("ls for a specific file\n"); 
+                if((dirLocation(fd, inputTokens->items[1], currDirectory, dataRegStart, spc)) != -1)
+                    directory = dirLocation(fd, inputTokens->items[1], currDirectory, dataRegStart, spc); 
+                else
+                {
+                        continue; 
+                }
+                
+                printf("directory for ls: %d\n", directory); 
+            }
+            else{
+                directory = currDirectory; 
+            }       
+
             int n = 32; 
-            temp = lseek(fd, currDirectory, SEEK_SET);
+            temp = lseek(fd, directory, SEEK_SET);
             temp2 = read(fd, &empty, 4); 
             while(empty != 0){
                 //printf("Empty = %d\n", empty); 
-                temp = lseek(fd, currDirectory+n, SEEK_SET);
+                temp = lseek(fd, directory+n, SEEK_SET);
                 
                 for(i=0; i<11; i++){
                 temp2 = read(fd, &fileName[i], 1);
@@ -101,4 +118,66 @@ void print_info(int bps, int spc, int rsc, int noF, int totS, int szF, int rc){
 
     printf("bytes per sector: %d\nsectors per cluster: %d\nreserved sector count: %d\nnumber of FATs: %d\ntotal sectors: %d\nFATsize: %d\nroot cluster: %d\n", bps, spc, rsc, noF, totS, szF, rc);
 
+}
+
+int dirLocation(int fd, char dirName[11], int curDir, int firstDataLoc, int spc){
+    printf("directory name: %s\n", dirName); 
+    printf("length of dirName: %d\n", strlen(dirName)); 
+    int i; 
+    int n = 32;
+    int empty = 0; 
+    off_t temp; 
+    int N = 0; 
+    ssize_t temp2;
+    int type =0; 
+    char name[11]; 
+    temp = lseek(fd, curDir, SEEK_SET);
+    temp2 = read(fd, &empty, 4); 
+
+    if(empty == 0)
+        return -1; 
+    while(empty != 0){
+        N = 0; 
+        temp = lseek(fd, curDir+n, SEEK_SET);
+                
+        for(i=0; i<11; i++){
+            temp2 = read(fd, &name[i], 1);    
+        }
+        //directory or not
+        temp2 = read(fd, &type, 1);  
+        
+        temp = lseek(fd, curDir+n+26, SEEK_SET);
+        temp2 = read(fd, &N, 2);  
+        printf("N: %d\n", N); 
+
+         printf("%stype:%d\n", name, type); 
+        for(i=0; i<strlen(dirName); i++){
+            if(dirName[i] != name[i])
+                break; 
+            if(dirName[i] == name[i] && i == (strlen(dirName)-1))
+                if(type == 16){
+                    printf("found the directory\n"); 
+                    printf("firstDataLoc: %d\n", firstDataLoc); 
+                    printf("spc:%d\n", spc); 
+                    return (firstDataLoc + 512*((N-2)*spc));
+                }
+                else{
+                    printf("%s is not a directory\n", dirName);
+                    return -1; 
+                }
+        }
+        // if(strcmp(dirName, name)==0 && type == 16)
+        //     return (firstDataLoc + (N-2)*spc);
+
+        // else if(strcmp(dirName, name)==0 && type == 16){
+        //     printf("%s is not a directory\n", dirName); 
+        //     return -1; 
+        // }
+
+        temp = lseek(fd, 21, SEEK_CUR);
+        temp2 = read(fd, &empty, 4); 
+        n+=64; 
+    }
+    printf("%s is not a directory\n", dirName); 
+    return -1; 
 }
