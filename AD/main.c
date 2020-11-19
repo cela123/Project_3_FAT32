@@ -10,8 +10,8 @@
 #include "parser.h"
 
 void print_info(int, int, int, int, int, int, int);
-unsigned int dirLocation(int fd, char dirName[11], int curDir, int firstDataLoc, int spc); 
-unsigned int next_cluster_num(unsigned int currentClusterNum); 
+int dirLocation(int fd, char dirName[11], int curDir, int firstDataLoc, int spc); 
+int next_cluster_num(int fd, unsigned int currentClusterNum, int rsc); 
 
 int main(){
 
@@ -52,7 +52,6 @@ int main(){
     temp = lseek(fd, 4, SEEK_CUR);
     temp2 = read(fd, &rc, 4);   
 
-
     dataRegStart = bps*(rsc + (noF*szF)); 
     //set current directory to the beginning of data region intially (ie start in root)
     currDirectory = dataRegStart; 
@@ -60,6 +59,8 @@ int main(){
 
 
     while(1){
+
+        next_cluster_num(fd, 3, rsc); 
 
         printf("$ ");
         char* input = get_input();
@@ -92,10 +93,16 @@ int main(){
             }       
 
             int clusterBytes = 32; 
+            int clusterNumber = 0; 
+            temp = lseek(fd, directory+clusterBytes+26, SEEK_SET);
+            temp2 = read(fd, &clusterNumber, 2); 
+            printf("clusterNumber: %d\n", clusterNumber); 
+
             temp = lseek(fd, directory, SEEK_SET);
             temp2 = read(fd, &empty, 4); 
             while(empty != 0){
                 //printf("Empty = %d\n", empty); 
+                empty = 0; 
                 temp = lseek(fd, directory+clusterBytes, SEEK_SET);
                 
                 for(i=0; i<11; i++){
@@ -105,7 +112,20 @@ int main(){
 
                 temp = lseek(fd, 21, SEEK_CUR);
                 temp2 = read(fd, &empty, 4); 
+
                 clusterBytes+=64; 
+
+                if(clusterBytes >= 512){
+                    clusterNumber = next_cluster_num(fd, clusterNumber, rsc); 
+                    clusterBytes = 32; 
+
+                    directory = dataRegStart + 512*(clusterNumber-2)*spc;
+
+                    temp = lseek(fd, directory, SEEK_SET);
+                    temp2 = read(fd, &empty, 4); 
+                }
+
+
             }
         }
     }
@@ -120,7 +140,7 @@ void print_info(int bps, int spc, int rsc, int noF, int totS, int szF, int rc){
 
 }
 
-unsigned int dirLocation(int fd, char dirName[11], int curDir, int firstDataLoc, int spc){
+int dirLocation(int fd, char dirName[11], int curDir, int firstDataLoc, int spc){
     printf("directory name: %s\n", dirName); 
     printf("length of dirName: %d\n", strlen(dirName)); 
     int i; 
@@ -146,7 +166,7 @@ unsigned int dirLocation(int fd, char dirName[11], int curDir, int firstDataLoc,
         //directory or not
         temp2 = read(fd, &type, 1);  
         
-        temp = lseek(fd, curDir+n+26, SEEK_SET);
+        temp = lseek(fd, curDir+clusterBytes+26, SEEK_SET);
         temp2 = read(fd, &N, 2);  
         printf("N: %d\n", N); 
 
@@ -176,8 +196,23 @@ unsigned int dirLocation(int fd, char dirName[11], int curDir, int firstDataLoc,
 }
 
 
-unsigned int next_cluster_num(unsigned int currentClusterNum){
+int next_cluster_num(int fd, unsigned int currentClusterNum, int rsc){
+    unsigned int FATdata; 
+    off_t temp;
+    ssize_t temp2;
 
+    printf("Caclulation: %d\n", (currentClusterNum*4 +(512*rsc))); 
+    temp = lseek(fd, (currentClusterNum*4 +(512*rsc)) , SEEK_SET);
+    temp2 = read(fd, &FATdata, 4); 
 
+    if(FATdata >= 0x0FFFFFFF){
+        printf("FAT Data: %d\n", FATdata); 
+        return -1; 
+    }
+    else{   
+        printf("FAT Data: %d\n", FATdata); 
+        return FATdata; 
+    }
+    
     
 }
