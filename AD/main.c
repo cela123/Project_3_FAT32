@@ -32,8 +32,6 @@ int main(){
     char fileName[11]; 
     int empty =0; 
 
-    
-
     int fd = open("fat32.img", O_RDONLY);
     
     int currDirectory;
@@ -151,8 +149,7 @@ void print_info(int bps, int spc, int rsc, int noF, int totS, int szF, int rc){
 }
 
 int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int spc){
-    //printf("directory name: %s\n", dirName); 
-    //printf("length of dirName: %d\n", strlen(dirName)); 
+
     int i; 
     int clusterBytes = 32;
     int empty = 0; 
