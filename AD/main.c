@@ -34,7 +34,7 @@ int main(){
 
     int dataRegStart; 
     int test; 
-    int i; 
+    int i, j; 
     char fileName[11]; 
     int empty =0; 
 
@@ -69,6 +69,52 @@ int main(){
         if(strcmp(inputTokens->items[0], "info") == 0){
 
             print_info(); 
+        }
+        if(strcmp(inputTokens->items[0], "size") == 0){
+            short n = 32;
+            int size = 0;
+            int type = 0;  
+            char tempStr[11]; 
+            temp = lseek(fd, currDirectory, SEEK_SET);
+            temp2 = read(fd, &empty, 4);
+            if(inputTokens->items[1] == NULL){
+                printf("No file specified for size\n"); 
+                continue; 
+            }
+            while(empty != 0){
+                temp = lseek(fd, currDirectory+n, SEEK_SET);
+
+                for(i = 0; i<11; i++){
+                    temp2 = read(fd, &tempStr[i], 1);
+                }
+                temp2 = read(fd, &type, 1);
+                // Removing trailing blank spaces
+                for(i = 0; i < 11; i++)
+                {
+                     if (!(tempStr[i] == ' ' && tempStr[i+1] == ' '))
+                     {
+                         fileName[j] = tempStr[i];
+                         j++;
+                     }
+                }
+                fileName[j-1] = '\0'; // one trailing blank kept showing up
+                j = 0;
+                if (strcmp(fileName, inputTokens->items[1]) == 0)
+                {
+                    break;
+                }
+                temp = lseek(fd, 21, SEEK_CUR);
+                temp2 = read(fd, &empty, 4);
+                n += 64;
+            } // End of While
+
+            if(type != 32)
+                printf("%s is not a file\n", inputTokens->items[1]); 
+            else{
+                temp = lseek(fd, currDirectory+n+28, SEEK_SET);
+                temp2 = read(fd, &size, 4);
+                printf("%d\n", size);
+            }
         }
         if(strcmp(inputTokens->items[0], "ls") == 0){
             int directory; 
