@@ -25,7 +25,7 @@ Bpb_info_struct bpb_information;
 void gather_info(int fd);
 void print_info();
 
-int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc); 
+int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int curCluster); 
 int next_cluster_num(int fd, unsigned int currentClusterNum); 
 
 int main(){
@@ -37,7 +37,11 @@ int main(){
     int i; 
     char fileName[11]; 
     int empty =0; 
+
+    //-------CURRENT DIRECTORY DATA-------
     int currDirectory;
+    int currDirectoryCluster; 
+    //------------------------------------
 
     int fd = open("fat32.img", O_RDONLY);
     if (fd == -1)
@@ -48,8 +52,9 @@ int main(){
     dataRegStart = bpb_information.bpb_bytspersec*(bpb_information.bpb_rsvdseccnt + (bpb_information.bpb_numfats*bpb_information.bpb_fatsz32)); 
     //set current directory to the beginning of data region intially (ie start in root)
     currDirectory = dataRegStart; 
+    currDirectoryCluster = bpb_information.bpb_rootclus; 
     printf("Data Region Start = %d\n", dataRegStart); 
-
+    printf("Root Cluster = %d\n", currDirectoryCluster); 
 
     while(1){
 
@@ -69,13 +74,14 @@ int main(){
             int directory; 
             int clusterNumber = 0; 
             int clusterBytes = 32; 
+            int counter = 0; 
 
             if(inputTokens->items[1]!= NULL){
                 //determine start of directory specified
                 printf("ls for a specific file\n"); 
-                if((dir_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart)) != -1){
-                        directory = (dataRegStart + 512*(( (dir_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart)) -2)*bpb_information.bpb_secperclus));
-                        clusterNumber = dir_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart); 
+                if((dir_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster)) != -1){
+                        directory = (dataRegStart + 512*(( (dir_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster)) -2)*bpb_information.bpb_secperclus));
+                        clusterNumber = dir_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster); 
 
                 }
                 else
@@ -87,15 +93,28 @@ int main(){
             }
             else{
                 directory = currDirectory; 
-                temp = lseek(fd, directory+(3*clusterBytes)+26, SEEK_SET);
-                temp2 = read(fd, &clusterNumber, 2); 
-            }       
+                clusterNumber = currDirectoryCluster; 
+            }      
 
-            printf("directory: %d\n", directory); 
-            printf("clusterNumber: %d\n", clusterNumber); 
+            //printf("directory: %d\n", directory); 
+            //printf("clusterNumber: %d\n", clusterNumber); 
 
             temp = lseek(fd, directory, SEEK_SET);
             temp2 = read(fd, &empty, 4); 
+
+            //reading "." for directories not the root
+            if((currDirectory != dataRegStart) && empty != 0){
+                temp = lseek(fd, directory, SEEK_SET);
+                for(i=0; i<11; i++){
+                    temp2 = read(fd, &fileName[i], 1);            
+                }
+                printf("%s\t", fileName); 
+                counter++; 
+                temp = lseek(fd, directory+32, SEEK_SET);
+                temp2 = read(fd, &empty, 4);
+
+            }
+                
             while(empty != 0){
                 //printf("Empty = %d\n", empty); 
                 empty = 0; 
@@ -104,7 +123,7 @@ int main(){
                 for(i=0; i<11; i++){
                     temp2 = read(fd, &fileName[i], 1);            
                 }
-                printf("%s\n", fileName); 
+                printf("%s\t", fileName); 
 
                 temp = lseek(fd, 21, SEEK_CUR);
                 temp2 = read(fd, &empty, 4); 
@@ -124,11 +143,39 @@ int main(){
                     else
                     {
                         empty = 0; 
-                    }
-                    
+                    }   
                 }
+                counter++; 
+                if(counter == 10){
+                    printf("\n"); 
+                    counter = 0; 
+                }
+            }
+            printf("\n"); 
+            
+        }
+        if(strcmp(inputTokens->items[0], "cd") == 0){
+            int newDirectoryCluster = 0; 
+            if(inputTokens->items[1] == NULL){
+                printf("No directory specified for cd you fucking idiot\n");
+            }
+            else if(strcmp(inputTokens->items[1], "..") == 0 && currDirectory == dataRegStart){
+                printf("No directory '..' for root\n");
+            }
+            else{
 
+                newDirectoryCluster = dir_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster);
+                if(newDirectoryCluster != -1){
 
+                    if((newDirectoryCluster == 0) && (currDirectory != dataRegStart)){
+                        currDirectoryCluster = bpb_information.bpb_rootclus; 
+                        currDirectory = dataRegStart;
+                    }
+                    else{
+                        currDirectoryCluster = newDirectoryCluster;
+                        currDirectory = dataRegStart + 512*(newDirectoryCluster-2)*bpb_information.bpb_secperclus;
+                    }
+                }
             }
         }
     }
@@ -172,24 +219,26 @@ void print_info(){
 
 }
 
-int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc){
+int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int curCluster){
 
     int i; 
     int clusterBytes = 32;
+    int currentClusterNum = curCluster; 
+    int directory = curDir; 
     int empty = 0; 
     off_t temp; 
     int N = 0; 
     ssize_t temp2;
     int type =0; 
     char name[11]; 
-    temp = lseek(fd, curDir, SEEK_SET);
+    temp = lseek(fd, directory, SEEK_SET);
     temp2 = read(fd, &empty, 4); 
 
     if(empty == 0)
         return -1; 
     while(empty != 0){
         N = 0; 
-        temp = lseek(fd, curDir+clusterBytes, SEEK_SET);
+        temp = lseek(fd, directory+clusterBytes, SEEK_SET);
                 
         for(i=0; i<11; i++){
             temp2 = read(fd, &name[i], 1);    
@@ -197,11 +246,9 @@ int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc){
         //directory or not
         temp2 = read(fd, &type, 1);  
         
-        temp = lseek(fd, curDir+clusterBytes+26, SEEK_SET);
+        temp = lseek(fd, directory+clusterBytes+26, SEEK_SET);
         temp2 = read(fd, &N, 2);  
-        //printf("N: %d\n", N); 
 
-         //printf("%stype:%d\n", name, type); 
         for(i=0; i<strlen(dirName); i++){
             if(dirName[i] != name[i])
                 break; 
@@ -221,6 +268,23 @@ int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc){
         temp = lseek(fd, 21, SEEK_CUR);
         temp2 = read(fd, &empty, 4); 
         clusterBytes+=64; 
+
+        if(clusterBytes >= 512){
+            if(next_cluster_num(fd, currentClusterNum) != -1){
+                currentClusterNum = next_cluster_num(fd, currentClusterNum); 
+                clusterBytes = 32; 
+
+                directory = firstDataLoc + 512*(currentClusterNum-2)*bpb_information.bpb_secperclus;
+
+                temp = lseek(fd, directory, SEEK_SET);
+                temp2 = read(fd, &empty, 4); 
+            }
+            else{
+                empty = 0; 
+            }   
+        }
+        
+        
     }
     printf("%s is not a directory\n", dirName); 
     return -1; 
@@ -236,13 +300,12 @@ int next_cluster_num(int fd, unsigned int currentClusterNum){
     temp2 = read(fd, &FATdata, 4); 
              
     if(FATdata >= 0x0FFFFFF8){
-        printf("Terminator FAT Data: %d\n", FATdata); 
+        //printf("Terminator FAT Data: %d\n", FATdata); 
         return -1; 
     }
     else{   
-        printf("Valid FAT Data: %d\n", FATdata); 
+        //printf("Valid FAT Data: %d\n", FATdata); 
         return FATdata; 
-    }
-    
-    
+    } 
 }
+
