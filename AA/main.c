@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include "parser.h"
+#include "hex_helper.h"
 
 typedef struct bpb_info_struct
 {
@@ -16,9 +17,19 @@ typedef struct bpb_info_struct
   unsigned int bpb_fatsz32, bpb_rootclus, bpb_totsec32;
 }Bpb_info_struct;
 
+struct DIRENTRY                 //useful for DIRENTRY* parameter for read/write
+{
+    unsigned char DIR_name[11];
+    unsigned char DIR_Attributes;
+} __attribute__((packed));      //use __attribute__((packed)) in order to avoid attribute padding
+
 Bpb_info_struct bpb_information;
-void print_info();
+
 void info(int fd);
+void ls(int fd);
+
+//helper functions
+void print_info();
 
 int main(){
 
@@ -46,14 +57,6 @@ int main(){
     return 0;
 }
 
-void print_info()
-{
-    printf("bytes per sector: %d\nsectors per cluster: %d\nreseverd sector count: %d\nnumber of FATs: %d\ntotal sectors: %d\nFATsize: %d\nroot cluster: %d\n",
-    bpb_information.bpb_bytspersec, bpb_information.bpb_secperclus, bpb_information.bpb_rsvdseccnt,
-    bpb_information.bpb_numfats, bpb_information.bpb_totsec32, bpb_information.bpb_fatsz32,
-    bpb_information.bpb_rootclus);
-}
-
 void info(int fd)
 {
   off_t temp_off_t;
@@ -71,5 +74,12 @@ void info(int fd)
   temp_ssize_t = read(fd, &bpb_information.bpb_rootclus, 4);
 
   print_info();
+}
 
+void print_info()
+{
+    printf("bpb_bytspersec: %d\nbpb_secperclus: %d\nbpb_rsvdseccnt: %d\nbpb_numfats: %d\nbpb_totsec32: %d\nbpb_fatsz32: %d\nbpb_rootclus: %d\n",
+    bpb_information.bpb_bytspersec, bpb_information.bpb_secperclus, bpb_information.bpb_rsvdseccnt,
+    bpb_information.bpb_numfats, bpb_information.bpb_totsec32, bpb_information.bpb_fatsz32,
+    bpb_information.bpb_rootclus);
 }
