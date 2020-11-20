@@ -27,6 +27,7 @@ void print_info();
 
 int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int curCluster); 
 int next_cluster_num(int fd, unsigned int currentClusterNum); 
+unsigned int find_empty_cluster(int fd); 
 
 int main(){
     off_t temp; 
@@ -224,7 +225,13 @@ int main(){
                 }
             }
         }
+        if(strcmp(inputTokens->items[0], "creat") == 0){
+            find_empty_cluster(fd); 
+            temp = lseek(fd, -4, SEEK_CUR);
+            write(fd, 0xFFFFFFFF, 4); 
+        }
     }
+
 
     close(fd); 
     return 0; 
@@ -355,3 +362,20 @@ int next_cluster_num(int fd, unsigned int currentClusterNum){
     } 
 }
 
+unsigned int find_empty_cluster(int fd){
+    int emptyCluster = 0; 
+    off_t temp; 
+    ssize_t temp2;
+    temp = lseek(fd, (bpb_information.bpb_rsvdseccnt*512) + (4*bpb_information.bpb_rootclus), SEEK_SET);
+    temp2 =read(fd, &emptyCluster, 4); 
+
+    while(emptyCluster != 0X0){
+        emptyCluster = 0;     
+        temp2 =read(fd, &emptyCluster, 4); 
+        printf("emptuCluster: %d\n", emptyCluster); 
+    }
+
+    return emptyCluster; 
+
+    
+}
