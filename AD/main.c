@@ -9,6 +9,9 @@
 #include <unistd.h>
 #include "parser.h"
 
+#define FILE_ATTRIBUTE 0X20
+#define DIRECTORY_ATTRIBUTE 0X10
+
 //Structs
 typedef struct bpb_info_struct
 {
@@ -30,7 +33,7 @@ typedef struct { // DIRECTORY ENTRY
     unsigned short DIR_WrtTime;         //offset byte 22, do not care
     unsigned short DIR_WrtDate;         //offset byte 24, do not care
     unsigned short DIR_FstClusLo;       //offset byte 26
-    unsigned short DIR_FileSize;        //offset byte 28
+    unsigned int DIR_FileSize;          //offset byte 28
 } __attribute__((packed)) DIR_ENTRY;
 
 Bpb_info_struct bpb_information;
@@ -39,10 +42,12 @@ Bpb_info_struct bpb_information;
 void gather_info(int fd);
 void print_info();
 int isCommand(char *); 
+int find_dir_entry(char*, int type, int curDir); 
 
 int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int curCluster); 
 int next_cluster_num(int fd, unsigned int currentClusterNum); 
 unsigned int find_empty_cluster(int fd); 
+void create_dir_entry(int type); 
 
 
 //MAIN STARTS
@@ -246,9 +251,45 @@ int main(){
             }
         }
         if(strcmp(inputTokens->items[0], "creat") == 0){
-            find_empty_cluster(fd); 
-            temp = lseek(fd, -4, SEEK_CUR);
-            //write(fd, 0xFFFFFFFF, 4); 
+            int newFileCluster = 0; 
+            if(inputTokens->items[1] == NULL){
+                printf("No file specified for creat\n"); 
+                continue; 
+            }
+            //if(dir_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster))
+
+            else{
+                newFileCluster = find_empty_cluster(fd); 
+                temp = lseek(fd, -4, SEEK_CUR);
+                //write(fd, 0xFFFFFFFF, 4);
+            }
+        }
+        if(strcmp(inputTokens->items[0], "mkdir") == 0){
+
+        }
+        if(strcmp(inputTokens->items[0], "mv") == 0){
+
+        }
+        if(strcmp(inputTokens->items[0], "open") == 0){
+
+        }
+        if(strcmp(inputTokens->items[0], "close") == 0){
+
+        }
+        if(strcmp(inputTokens->items[0], "lseek") == 0){
+
+        }
+        if(strcmp(inputTokens->items[0], "read") == 0){
+
+        }
+        if(strcmp(inputTokens->items[0], "write") == 0){
+
+        }
+        if(strcmp(inputTokens->items[0], "rm") == 0){
+
+        }
+        if(strcmp(inputTokens->items[0], "cp") == 0){
+
         }
         
         if(isCommand(inputTokens->items[0]) == -1){
@@ -301,6 +342,8 @@ int isCommand(char * userCmd){
         return 0; 
     else if(strcmp(userCmd, "info") == 0)
         return 0; 
+    else if(strcmp(userCmd, "size") == 0)
+        return 0;         
     else if(strcmp(userCmd, "ls") == 0)
         return 0; 
     else if(strcmp(userCmd, "cd") == 0)
@@ -327,6 +370,15 @@ int isCommand(char * userCmd){
         return 0; 
     else
              return -1; 
+}
+
+/*
+    Function: dir_cluster_num
+    Returns the cluster number for a given directory name in the current directory
+    Will return -1 if no directory with provided name can be found
+*/
+int find_dir_entry(char* dirName, int type, int curDir){
+
 }
 
 /*
@@ -408,7 +460,7 @@ int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int 
 
 /*
     Function: next_cluster_num
-    Navigates the FAT region to determine the cluster that comes after the current ccluster
+    Navigates the FAT region to determine the cluster that comes after the current cluster
     Returns the next cluster number
     Will return -1 if current cluster is the last cluster
 */
@@ -430,20 +482,26 @@ int next_cluster_num(int fd, unsigned int currentClusterNum){
     } 
 }
 
+/*
+    Function: find_empty_cluster
+    Reads through the FAT until the first empty cluster is found
+    Re
+*/
 unsigned int find_empty_cluster(int fd){
-    int emptyCluster = 0; 
+    int emptyClusterNum = 0; 
+    int fatCluster = 0; 
     off_t temp; 
     ssize_t temp2;
+    printf("%d\n", (bpb_information.bpb_rsvdseccnt*512) + (4*bpb_information.bpb_rootclus)); 
     temp = lseek(fd, (bpb_information.bpb_rsvdseccnt*512) + (4*bpb_information.bpb_rootclus), SEEK_SET);
-    temp2 =read(fd, &emptyCluster, 4); 
+    temp2 =read(fd, &fatCluster, 4); 
 
-    while(emptyCluster != 0X0){
-        emptyCluster = 0;     
-        temp2 =read(fd, &emptyCluster, 4); 
-        printf("emptuCluster: %d\n", emptyCluster); 
+    while(fatCluster != 0X0){
+        fatCluster = 0;     
+        temp2 =read(fd, &fatCluster, 4); 
+        emptyClusterNum++; 
+        //printf("emptuCluster: %d\n", emptyCluster); 
     }
 
-    return emptyCluster; 
-
-    
+    return emptyClusterNum; 
 }
