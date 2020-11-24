@@ -328,6 +328,12 @@ int isCommand(char * userCmd){
     else
              return -1; 
 }
+
+/*
+    Function: dir_cluster_num
+    Returns the cluster nu,ber for a given directory name in the current directory
+    Will return -1 if no directory with provided name can be found
+*/
 int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int curCluster){
 
     int i; 
