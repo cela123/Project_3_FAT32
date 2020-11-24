@@ -331,7 +331,7 @@ int isCommand(char * userCmd){
 
 /*
     Function: dir_cluster_num
-    Returns the cluster nu,ber for a given directory name in the current directory
+    Returns the cluster number for a given directory name in the current directory
     Will return -1 if no directory with provided name can be found
 */
 int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int curCluster){
@@ -406,6 +406,12 @@ int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int 
 }
 
 
+/*
+    Function: next_cluster_num
+    Navigates the FAT region to determine the cluster that comes after the current ccluster
+    Returns the next cluster number
+    Will return -1 if current cluster is the last cluster
+*/
 int next_cluster_num(int fd, unsigned int currentClusterNum){
     unsigned int FATdata; 
     off_t temp;
