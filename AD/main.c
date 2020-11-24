@@ -18,8 +18,19 @@ typedef struct bpb_info_struct
 }Bpb_info_struct;
 
 typedef struct { // DIRECTORY ENTRY
-    unsigned char takeUpSpace[32];
-    unsigned char DIR_Name[11];
+    unsigned char longnameListing[32];  //skip over the 32 bytes of the long listing
+    unsigned char DIR_Name[11];         //offset byte 0
+    unsigned char DIR_Attributes;       //offset byte 11
+    unsigned short DIR_NTRes;           //offset byte 12, do not care
+    unsigned short DIR_CrtTimeTenth;    //offset byte 13, do not care
+    unsigned short DIR_CrtTime;         //offset byte 14, do not care
+    unsigned short DIR_CrtDate;         //offset byte 16, do not care
+    unsigned short DIR_LastAccDate;     //offset byte 18, do not care
+    unsigned short DIR_FstClusHI;       //offset byte 20
+    unsigned short DIR_WrtTime;         //offset byte 22, do not care
+    unsigned short DIR_WrtDate;         //offset byte 24, do not care
+    unsigned short DIR_FstClusLo;       //offset byte 26
+    unsigned short DIR_FileSize;        //offset byte 28
 } __attribute__((packed)) DIR_ENTRY;
 
 Bpb_info_struct bpb_information;
@@ -239,6 +250,7 @@ int main(){
             temp = lseek(fd, -4, SEEK_CUR);
             //write(fd, 0xFFFFFFFF, 4); 
         }
+        
         if(isCommand(inputTokens->items[0]) == -1){
             printf("%s is not a command\n", inputTokens->items[0]); 
         }
