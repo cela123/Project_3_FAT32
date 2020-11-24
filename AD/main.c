@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include "parser.h"
 
+//Structs
 typedef struct bpb_info_struct
 {
   unsigned short bpb_bytspersec, bpb_secperclus,
@@ -22,13 +23,18 @@ typedef struct { // DIRECTORY ENTRY
 } __attribute__((packed)) DIR_ENTRY;
 
 Bpb_info_struct bpb_information;
+
+//Function Declarations
 void gather_info(int fd);
 void print_info();
+int isCommand(char *); 
 
 int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int curCluster); 
 int next_cluster_num(int fd, unsigned int currentClusterNum); 
 unsigned int find_empty_cluster(int fd); 
 
+
+//MAIN STARTS
 int main(){
     off_t temp; 
     ssize_t temp2;
@@ -133,10 +139,11 @@ int main(){
                 }
                 else
                 {
+                    printf("%s is not a directory\n", inputTokens->items[1]); 
                     continue; 
                 }
                 
-                printf("directory for ls: %d\n", directory); 
+                //printf("directory for ls: %d\n", directory); 
             }
             else{
                 directory = currDirectory; 
@@ -212,7 +219,9 @@ int main(){
             else{
 
                 newDirectoryCluster = dir_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster);
-                if(newDirectoryCluster != -1){
+                if(newDirectoryCluster == -1)
+                    printf("%s is not a directory\n", inputTokens->items[1]); 
+                else{
 
                     if((newDirectoryCluster == 0) && (currDirectory != dataRegStart)){
                         currDirectoryCluster = bpb_information.bpb_rootclus; 
@@ -228,7 +237,10 @@ int main(){
         if(strcmp(inputTokens->items[0], "creat") == 0){
             find_empty_cluster(fd); 
             temp = lseek(fd, -4, SEEK_CUR);
-            write(fd, 0xFFFFFFFF, 4); 
+            //write(fd, 0xFFFFFFFF, 4); 
+        }
+        if(isCommand(inputTokens->items[0]) == -1){
+            printf("%s is not a command\n", inputTokens->items[0]); 
         }
     }
 
@@ -272,6 +284,38 @@ void print_info(){
 
 }
 
+int isCommand(char * userCmd){
+    if(strcmp(userCmd, "exit") == 0)
+        return 0; 
+    else if(strcmp(userCmd, "info") == 0)
+        return 0; 
+    else if(strcmp(userCmd, "ls") == 0)
+        return 0; 
+    else if(strcmp(userCmd, "cd") == 0)
+        return 0; 
+    else if(strcmp(userCmd, "creat") == 0)
+        return 0; 
+    else if(strcmp(userCmd, "mkdir") == 0)
+        return 0; 
+    else if(strcmp(userCmd, "mv") == 0)
+        return 0; 
+    else if(strcmp(userCmd, "open") == 0)
+        return 0; 
+    else if(strcmp(userCmd, "close") == 0)
+        return 0; 
+    else if(strcmp(userCmd, "lseek") == 0)
+        return 0; 
+    else if(strcmp(userCmd, "read") == 0)
+        return 0; 
+    else if(strcmp(userCmd, "write") == 0)
+        return 0; 
+    else if(strcmp(userCmd, "rm") == 0)
+        return 0; 
+    else if(strcmp(userCmd, "cp") == 0)
+        return 0; 
+    else
+             return -1; 
+}
 int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int curCluster){
 
     int i; 
@@ -313,7 +357,7 @@ int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int 
                     return N;
                 }
                 else{
-                    printf("%s is not a directory\n", dirName);
+                    
                     return -1; 
                 }
         }
@@ -339,7 +383,7 @@ int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int 
         
         
     }
-    printf("%s is not a directory\n", dirName); 
+    //printf("%s is not a directory\n", dirName); 
     return -1; 
 }
 
