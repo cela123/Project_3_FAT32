@@ -36,20 +36,19 @@ Bpb_info_struct bpb_information;
 void gather_info(int fd);
 void print_info();
 int isCommand(char *);
-int create(char* name, int dirCheck, int fd);
-void fill_dir_entry(DIR_ENTRY* entry, int dir, int fd);
+int create(char* name, int dirCheck, int fd, int dataRegStart);
 
 int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int curCluster);
 int next_cluster_num(int fd, unsigned int currentClusterNum);
-unsigned int find_empty_cluster(int fd);
-
-
+int find_empty_cluster(int fd, int dataRegStart);
+void fill_dir_entry(DIR_ENTRY* entry, int dir, int fd);
 
 int main(){
     off_t temp;
     ssize_t temp2;
 
     int dataRegStart;
+    int firstDataSector;
     int test;
     int i, j;
     char fileName[11];
@@ -69,13 +68,14 @@ int main(){
 
 
     dataRegStart = bpb_information.bpb_bytspersec*(bpb_information.bpb_rsvdseccnt + (bpb_information.bpb_numfats*bpb_information.bpb_fatsz32));
+    //firstDataSector = 2050 bytes but 2050 * 512 is the dataRegStart
+    //firstDataSector = bpb_information.bpb_rsvdseccnt + (bpb_information.bpb_numfats * bpb_information.bpb_fatsz32);
     //set current directory to the beginning of data region intially (ie start in root)
     currDirectory = dataRegStart;
     currDirectoryCluster = bpb_information.bpb_rootclus;
     printf("Data Region Start = %d\n", dataRegStart);
     printf("Root Cluster = %d\n", currDirectoryCluster);
-    dir_cluster_num(fd, "BLUE", currDirectory, dataRegStart, currDirectoryCluster);
-    fill_dir_entry(tempdir, 0x100460, fd);
+
     while(1){
 
         printf("$ ");
@@ -248,8 +248,10 @@ int main(){
             }
         }
         if(strcmp(inputTokens->items[0], "creat") == 0){
-            find_empty_cluster(fd);
-            temp = lseek(fd, -4, SEEK_CUR);
+            //
+            //temp = lseek(fd, -4, SEEK_CUR);
+            create("temp", 0, fd, dataRegStart);
+            find_empty_cluster(fd, dataRegStart);
             //write(fd, 0xFFFFFFFF, 4);
         }
 
@@ -327,6 +329,14 @@ int isCommand(char * userCmd){
              return -1;
 }
 
+int create(char* name, int dirCheck, int fd, int dataRegStart){
+    DIR_ENTRY * temp;
+    fill_dir_entry(temp, 0x100460, fd);
+    printf("%d\n", find_empty_cluster(fd, dataRegStart));
+}
+
+//Helper functions
+
 /*
     Function: dir_cluster_num
     Returns the cluster number for a given directory name in the current directory
@@ -403,7 +413,6 @@ int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int 
     return -1;
 }
 
-
 /*
     Function: next_cluster_num
     Navigates the FAT region to determine the cluster that comes after the current cluster
@@ -428,11 +437,36 @@ int next_cluster_num(int fd, unsigned int currentClusterNum){
     }
 }
 
+/*
+    Function: find_empty_cluster
+    Finds the next empty space to place a cluster
+    Returns the next empty cluster
+*/
+int find_empty_cluster(int fd, int dataRegStart){
+    int fatregionstart = 0x4000;    //start at fatreg
+    int clusterNumber;
+    off_t temp;
+    ssize_t temp2;
+    for (int i = 0; fatregionstart + (i * 4) < dataRegStart; i++) //fatregionstart + (i * 4) for reading 4 bytes at a time starting at 0x4000
+    {
+        temp = lseek(fd, fatregionstart + (i * 4), SEEK_SET);
+        temp2 = read(fd, &clusterNumber, 4);
+
+        if(clusterNumber == 0x0)
+          return fatregionstart + (i * 4);
+    }
+    return -1;
+}
+/*
+    Function: fill_dir_entry
+    Fills out the important data of a directory entry
+*/
 void fill_dir_entry(DIR_ENTRY* entry, int dir, int fd){
     off_t temp;
     ssize_t temp2;
     temp = lseek(fd, dir, SEEK_SET);
 
+    //grab the important data at a direntry to copy
     temp2 = read(fd, &entry->DIR_Name, 11);
     entry->DIR_Name[10] = '\0';
     temp2 = read(fd, &entry->DIR_Attributes, 1);
@@ -442,28 +476,7 @@ void fill_dir_entry(DIR_ENTRY* entry, int dir, int fd){
     temp2 = read(fd, &entry->DIR_FstClusLo, 2);
     temp2 = read(fd, &entry->DIR_FileSize, 4);
 
-    printf("Inside fill_dir_entry\nDIR_Name: %s\nDIR_Attributes: %d\nDIR_FstClusHI: %d\nDIR_FstClusLo: %d\nDIR_FileSize: %d\n",
+    printf("DIR_Name: %s\nDIR_Attributes: %d\nDIR_FstClusHI: %d\nDIR_FstClusLo: %d\nDIR_FileSize: %d\n",
     entry->DIR_Name, entry->DIR_Attributes, entry->DIR_FstClusHI, entry->DIR_FstClusLo, entry->DIR_FileSize);
-
-}
-
-int create(char* name, int dirCheck, int fd){
-    DIR_ENTRY * temp;
-}
-
-unsigned int find_empty_cluster(int fd){
-    int emptyCluster = 0;
-    off_t temp;
-    ssize_t temp2;
-    temp = lseek(fd, (bpb_information.bpb_rsvdseccnt*512) + (4*bpb_information.bpb_rootclus), SEEK_SET);
-    temp2 =read(fd, &emptyCluster, 4);
-
-    while(emptyCluster != 0X0){
-        emptyCluster = 0;
-        temp2 =read(fd, &emptyCluster, 4);
-        printf("emptuCluster: %d\n", emptyCluster);
-    }
-
-    return emptyCluster;
 
 }
