@@ -42,7 +42,7 @@ Bpb_info_struct bpb_information;
 void gather_info(int fd);
 void print_info();
 int isCommand(char *); 
-int find_dir_entry(char*, int type, int curDir); 
+int find_dir_entry(int fd, char* dirName, int curDir); 
 
 int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int curCluster); 
 int next_cluster_num(int fd, unsigned int currentClusterNum); 
@@ -252,23 +252,60 @@ int main(){
         }
         if(strcmp(inputTokens->items[0], "creat") == 0){
             int newFileCluster = 0; 
+            
             if(inputTokens->items[1] == NULL){
-                printf("No file specified for creat\n"); 
+                printf("Missing operand for creat\n"); 
+                continue; 
+            }
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20){
+                printf("%s is already a file\n", inputTokens->items[1]);
                 continue; 
             }
             //if(dir_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster))
 
             else{
+                printf("creating new file\n"); 
                 newFileCluster = find_empty_cluster(fd); 
                 temp = lseek(fd, -4, SEEK_CUR);
                 //write(fd, 0xFFFFFFFF, 4);
             }
         }
         if(strcmp(inputTokens->items[0], "mkdir") == 0){
-
+            if(inputTokens->items[1] == NULL){
+                printf("Missing operand for mkdir\n"); 
+                continue; 
+            }
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10){
+                printf("%s is already a directory\n", inputTokens->items[1]);
+                continue; 
+            }
         }
-        if(strcmp(inputTokens->items[0], "mv") == 0){
+        if(strcmp(inputTokens->items[0], "mv") == 0){   //mv FROM TO, [1] = FROM ,[2] = TO
+            if(inputTokens->items[1] == NULL){
+                printf("Missing file operand\n"); 
+                continue; 
+            }
+            if(inputTokens->items[2] == NULL){
+                printf("Missing destination file operand\n"); 
+                continue; 
+            }
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20 && find_dir_entry(fd, inputTokens->items[2], currDirectory) == 0x20){
+                printf("The name '%s' is already being used by another file\n", inputTokens->items[2]); 
+                continue;                 
+            }
+            if(find_dir_entry(fd, inputTokens->items[2], currDirectory) == 0x20 && find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10){
+                printf("Cannot move directory: invalid destination argument\n"); 
+                continue; 
+            }
 
+            if(find_dir_entry(fd, inputTokens->items[2], currDirectory) == -1){
+                printf("rename %s to %s\n", inputTokens->items[1], inputTokens->items[2]); 
+                //if TO does not exit, rename FROM to TO
+            }
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10){
+                printf("moving %s to %s\n", inputTokens->items[1], inputTokens->items[2]); 
+                //if TO exists and it a directory, move FROM inside TO
+            }
         }
         if(strcmp(inputTokens->items[0], "open") == 0){
 
@@ -301,6 +338,7 @@ int main(){
     close(fd); 
     return 0; 
 }
+//MAIN ENDS
 
 void gather_info(int fd)
 {
@@ -325,8 +363,6 @@ void gather_info(int fd)
     temp_off_t = lseek(fd, 4, SEEK_CUR);
     temp_ssize_t = read(fd, &bpb_information.bpb_rootclus, 4);
 }
-
-
 
 void print_info(){
 
@@ -373,11 +409,65 @@ int isCommand(char * userCmd){
 }
 
 /*
-    Function: dir_cluster_num
-    Returns the cluster number for a given directory name in the current directory
-    Will return -1 if no directory with provided name can be found
+    Function: find_dir_entry
+    Returns 0x20 for a file, returns 0x10 for a directory
+    Will return -1 if no file/directory with provided name can be found
 */
-int find_dir_entry(char* dirName, int type, int curDir){
+int find_dir_entry(int fd, char* dirEntryName, int curDir){
+    int i; 
+    int type = 0; 
+    off_t temp; 
+    ssize_t temp2;
+    int clusterBytes = 32;
+    int empty = 0; 
+    char name[11]; 
+    int dataStart = bpb_information.bpb_bytspersec*(bpb_information.bpb_rsvdseccnt + (bpb_information.bpb_numfats*bpb_information.bpb_fatsz32)); 
+    int currentClusterNum = 2 + (curDir - dataStart)/512;
+    int curDirDataReg = curDir; 
+
+    temp = lseek(fd, curDirDataReg, SEEK_SET);
+    temp2 = read(fd, &empty, 4); 
+
+    if(empty == 0)
+        return -1; 
+
+    while(empty != 0){
+
+        temp = lseek(fd, curDirDataReg+clusterBytes, SEEK_SET);
+        for(i=0; i<11; i++){
+            temp2 = read(fd, &name[i], 1);    
+        }
+        temp2 = read(fd, &type, 1); 
+
+        for(i=0; i<strlen(dirEntryName); i++){
+            if(dirEntryName[i] != name[i])
+                break; 
+            if(dirEntryName[i] == name[i] && i == (strlen(dirEntryName)-1))
+                return type; 
+        } 
+
+        temp = lseek(fd, 21, SEEK_CUR);
+        temp2 = read(fd, &empty, 4); 
+        clusterBytes+=64;  
+
+        if(clusterBytes >= 512){
+            if(next_cluster_num(fd, currentClusterNum) != -1){
+                currentClusterNum = next_cluster_num(fd, currentClusterNum); 
+                clusterBytes = 32; 
+
+                curDirDataReg = dataStart + 512*(currentClusterNum-2)*bpb_information.bpb_secperclus;
+
+                temp = lseek(fd, curDirDataReg, SEEK_SET);
+                temp2 = read(fd, &empty, 4); 
+            }
+            else{
+                empty = 0; 
+            }   
+        }
+
+    }
+
+    return -1; 
 
 }
 
@@ -415,6 +505,10 @@ int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int 
         
         temp = lseek(fd, directory+clusterBytes+26, SEEK_SET);
         temp2 = read(fd, &N, 2);  
+
+        type = find_dir_entry(fd, name, curDir);
+
+         
 
         for(i=0; i<strlen(dirName); i++){
             if(dirName[i] != name[i])
