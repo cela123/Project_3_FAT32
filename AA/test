@@ -1,0 +1,7 @@
+#!/bin/bash
+
+rm fat32.img
+cp nfat32.img fat32.img
+make
+main
+make clean
