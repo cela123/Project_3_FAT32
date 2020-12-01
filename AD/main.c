@@ -46,6 +46,8 @@ int find_dir_entry(int fd, char* dirName, int curDir);
 
 int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int curCluster); 
 int next_cluster_num(int fd, unsigned int currentClusterNum); 
+
+int file_size(int fd, char* fileName, int curDir); 
 unsigned int find_empty_cluster(int fd); 
 void create_dir_entry(int type); 
 
@@ -104,6 +106,12 @@ int main(){
                 printf("No file specified for size\n"); 
                 continue; 
             }
+            if(find_dir_entry(fd, inputTokens->items[1] == 0x20)){
+                //implementation
+            }
+            else{
+                printf("%s is not a file\n", inputTokens->items[1]); 
+            }
             while(empty != 0){
                 temp = lseek(fd, currDirectory+n, SEEK_SET);
 
@@ -151,6 +159,8 @@ int main(){
                 if((dir_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster)) != -1){
                         directory = (dataRegStart + 512*(( (dir_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster)) -2)*bpb_information.bpb_secperclus));
                         clusterNumber = dir_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster); 
+                        printf(".          \t"); 
+                        counter++; 
 
                 }
                 else
@@ -216,7 +226,7 @@ int main(){
                     }   
                 }
                 counter++; 
-                if(counter == 10){
+                if(counter == 6){
                     printf("\n"); 
                     counter = 0; 
                 }
@@ -340,23 +350,105 @@ int main(){
                 }                          
             }     
         }
-        if(strcmp(inputTokens->items[0], "close") == 0){
+        if(strcmp(inputTokens->items[0], "close") == 0){    //close FILENAME
+            if(inputTokens->items[1] == NULL){
+                printf("Missing file operand\n"); 
+                continue; 
+            }
+            //error if name DNE or is for a directory not a file
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10 || find_dir_entry(fd, inputTokens->items[1], currDirectory) == -1){
+                printf("File %s does not exist\n", inputTokens->items[1]); 
+                continue;
+            }     
+            //implement a size function and compare function return and offset user provides         
 
         }
-        if(strcmp(inputTokens->items[0], "lseek") == 0){
+        if(strcmp(inputTokens->items[0], "lseek") == 0){    //lseek FILENAME OFFSET
+            if(inputTokens->items[1] == NULL){
+                printf("Missing file operand\n"); 
+                continue; 
+            }
+            if(inputTokens->items[2] == NULL){
+                printf("Missing offset operand\n"); 
+                continue;   
+            }
 
         }
-        if(strcmp(inputTokens->items[0], "read") == 0){
+        if(strcmp(inputTokens->items[0], "read") == 0){     //read FILENAME SIZE
+            if(inputTokens->items[1] == NULL){
+                printf("Missing file operand\n"); 
+                continue; 
+            }
+            if(inputTokens->items[2] == NULL){
+                printf("Missing size operand\n"); 
+                continue;   
+            }
+            //error if name DNE or is for a directory not a file
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10 || find_dir_entry(fd, inputTokens->items[1], currDirectory) == -1){
+                printf("File %s does not exist\n", inputTokens->items[1]); 
+                continue;
+            }  
 
         }
-        if(strcmp(inputTokens->items[0], "write") == 0){
+        if(strcmp(inputTokens->items[0], "write") == 0){    //write FILENAME SIZE "STRING"
+            if(inputTokens->items[1] == NULL){
+                printf("Missing file operand\n"); 
+                continue; 
+            }
+            if(inputTokens->items[2] == NULL){
+                printf("Missing size operand\n"); 
+                continue;   
+            }       
+            if(inputTokens->items[3] == NULL){
+                printf("Missing string to write to %s\n", inputTokens->items[1]); 
+                continue;   
+            }                 
+            //error if name DNE or is for a directory not a file
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10 || find_dir_entry(fd, inputTokens->items[1], currDirectory) == -1){
+                printf("File %s does not exist\n", inputTokens->items[1]); 
+                continue;
+            } 
+        }
+        if(strcmp(inputTokens->items[0], "rm") == 0){       //rm FILENAME
+            if(inputTokens->items[1] == NULL){
+                printf("Missing file operand\n"); 
+                continue; 
+            }
+            //error if name DNE or is for a directory not a file
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10 || find_dir_entry(fd, inputTokens->items[1], currDirectory) == -1){
+                printf("File %s does not exist\n", inputTokens->items[1]); 
+                continue;
+            } 
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10 || find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20)  {
+                printf("Removing %s\n", inputTokens->items[1]);
+            }                      
 
         }
-        if(strcmp(inputTokens->items[0], "rm") == 0){
+        if(strcmp(inputTokens->items[0], "cp") == 0){       //cp FILENAME TO
+            if(inputTokens->items[1] == NULL){
+                printf("Missing file operand\n"); 
+                continue; 
+            }
+            
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) != 0x20){
+                printf("File %s does not exist\n", inputTokens->items[1]); 
+                continue;
+            } 
+            //if destination is not specific or is not a valid destination
+            if(inputTokens->items[2] == NULL || find_dir_entry(fd, inputTokens->items[2], currDirectory) != 0x10){
+                if(find_dir_entry(fd, inputTokens->items[2], currDirectory) == 0x20){
+                    printf("Cannot create copy of %s with name %s. File with name %s already exists.\n", inputTokens->items[1], inputTokens->items[2],inputTokens->items[2]); 
+                    continue; 
+                }
+                //create a copy of the file in current directory with name TO
+                printf("Creating copy of %s in current directory with name %s\n", inputTokens->items[1], inputTokens->items[2]); 
+                continue; 
+            }
 
-        }
-        if(strcmp(inputTokens->items[0], "cp") == 0){
-
+            //if TO is directory, create copy of FILENAME in TO
+            if(find_dir_entry(fd, inputTokens->items[2], currDirectory) == 0x10 && find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20){
+                printf("Creating copy of %s in %s\n", inputTokens->items[1], inputTokens->items[2]); 
+            }  
         }
         
         if(isCommand(inputTokens->items[0]) == -1){
@@ -472,9 +564,9 @@ int find_dir_entry(int fd, char* dirEntryName, int curDir){
         for(i=0; i<strlen(dirEntryName); i++){
             if(dirEntryName[i] != name[i])
                 break; 
-            if(dirEntryName[i] == name[i] && i == (strlen(dirEntryName)-1))
+            if(dirEntryName[i] == name[i] && i == (strlen(dirEntryName)-1) && name[i+1] == ' ')
                 return type; 
-        } 
+        }      
 
         temp = lseek(fd, 21, SEEK_CUR);
         temp2 = read(fd, &empty, 4); 
@@ -536,7 +628,7 @@ int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int 
         temp = lseek(fd, directory+clusterBytes+26, SEEK_SET);
         temp2 = read(fd, &N, 2);  
 
-        type = find_dir_entry(fd, name, curDir);
+        //type = find_dir_entry(fd, dirName, curDir);
 
          
 
@@ -604,6 +696,46 @@ int next_cluster_num(int fd, unsigned int currentClusterNum){
         //printf("Valid FAT Data: %d\n", FATdata); 
         return FATdata; 
     } 
+}
+
+
+int file_size(int fd, char* fileName, int curDir){
+    off_t temp;
+    int i,j; 
+    ssize_t temp2;    
+    int clusterBytes = 0; 
+    int size = 0; 
+    int empty = 0; 
+    char tempStr[11]; 
+    temp = lseek(fd, curDir, SEEK_SET);
+    temp2 = read(fd, &empty, 4);
+
+    while(empty != 0){
+        temp = lseek(fd, curDir+clusterBytes, SEEK_SET);
+
+        for(i = 0; i<11; i++){
+            temp2 = read(fd, &tempStr[i], 1);
+        }
+        //temp2 = read(fd, &type, 1);
+        // Removing trailing blank spaces
+        for(i = 0; i < 11; i++)
+        {
+            if (!(tempStr[i] == ' ' && tempStr[i+1] == ' '))
+            {
+                fileName[j] = tempStr[i];
+                    j++;
+            }
+        }
+        fileName[j-1] = '\0'; // one trailing blank kept showing up
+        j = 0;
+        if (strcmp(fileName, inputTokens->items[1]) == 0){
+            break;
+        }
+        temp = lseek(fd, 21, SEEK_CUR);
+        temp2 = read(fd, &empty, 4);
+        n += 64;
+    }
+
 }
 
 /*
