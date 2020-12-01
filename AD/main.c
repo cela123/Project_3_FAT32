@@ -96,55 +96,17 @@ int main(){
             print_info(); 
         }
         if(strcmp(inputTokens->items[0], "size") == 0){
-            short n = 32;
-            int size = 0;
-            int type = 0;  
-            char tempStr[11]; 
-            temp = lseek(fd, currDirectory, SEEK_SET);
-            temp2 = read(fd, &empty, 4);
+
             if(inputTokens->items[1] == NULL){
                 printf("No file specified for size\n"); 
                 continue; 
             }
-            if(find_dir_entry(fd, inputTokens->items[1] == 0x20)){
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20){
                 //implementation
+                printf("%s: %d\n", inputTokens->items[1] , file_size(fd, inputTokens->items[1], currDirectory)); 
             }
             else{
                 printf("%s is not a file\n", inputTokens->items[1]); 
-            }
-            while(empty != 0){
-                temp = lseek(fd, currDirectory+n, SEEK_SET);
-
-                for(i = 0; i<11; i++){
-                    temp2 = read(fd, &tempStr[i], 1);
-                }
-                temp2 = read(fd, &type, 1);
-                // Removing trailing blank spaces
-                for(i = 0; i < 11; i++)
-                {
-                     if (!(tempStr[i] == ' ' && tempStr[i+1] == ' '))
-                     {
-                         fileName[j] = tempStr[i];
-                         j++;
-                     }
-                }
-                fileName[j-1] = '\0'; // one trailing blank kept showing up
-                j = 0;
-                if (strcmp(fileName, inputTokens->items[1]) == 0)
-                {
-                    break;
-                }
-                temp = lseek(fd, 21, SEEK_CUR);
-                temp2 = read(fd, &empty, 4);
-                n += 64;
-            } // End of While
-
-            if(type != 32)
-                printf("%s is not a file\n", inputTokens->items[1]); 
-            else{
-                temp = lseek(fd, currDirectory+n+28, SEEK_SET);
-                temp2 = read(fd, &size, 4);
-                printf("%d\n", size);
             }
         }
         if(strcmp(inputTokens->items[0], "ls") == 0){
@@ -364,14 +326,31 @@ int main(){
 
         }
         if(strcmp(inputTokens->items[0], "lseek") == 0){    //lseek FILENAME OFFSET
+            int offset; 
             if(inputTokens->items[1] == NULL){
                 printf("Missing file operand\n"); 
                 continue; 
+            }
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) != 0x20){
+                printf("%s is not a file\n",inputTokens->items[1]); 
+                continue;  
             }
             if(inputTokens->items[2] == NULL){
                 printf("Missing offset operand\n"); 
                 continue;   
             }
+            else{
+                offset = atoi(inputTokens->items[2]);
+            }
+            //if OFFSET > FILE SIZE return error
+            if(offset > file_size(fd, inputTokens->items[1], currDirectory)){
+                printf("Offset value larger than file size\n"); 
+                continue; 
+            }
+            else{
+
+            }
+
 
         }
         if(strcmp(inputTokens->items[0], "read") == 0){     //read FILENAME SIZE
@@ -702,40 +681,57 @@ int next_cluster_num(int fd, unsigned int currentClusterNum){
 int file_size(int fd, char* fileName, int curDir){
     off_t temp;
     int i,j; 
-    ssize_t temp2;    
-    int clusterBytes = 0; 
+    ssize_t temp2; 
+    int directory = curDir;    
+    int clusterBytes = 32; 
     int size = 0; 
     int empty = 0; 
+    char name[11]; 
     char tempStr[11]; 
     temp = lseek(fd, curDir, SEEK_SET);
     temp2 = read(fd, &empty, 4);
+    int dataStart = bpb_information.bpb_bytspersec*(bpb_information.bpb_rsvdseccnt + (bpb_information.bpb_numfats*bpb_information.bpb_fatsz32)); 
+    int currentClusterNum = 2 + (curDir - dataStart)/512;
+    int curDirDataReg = curDir; 
+
 
     while(empty != 0){
-        temp = lseek(fd, curDir+clusterBytes, SEEK_SET);
 
-        for(i = 0; i<11; i++){
-            temp2 = read(fd, &tempStr[i], 1);
+        temp = lseek(fd, directory+clusterBytes, SEEK_SET);
+                
+        for(i=0; i<11; i++){
+            temp2 = read(fd, &name[i], 1);    
         }
-        //temp2 = read(fd, &type, 1);
-        // Removing trailing blank spaces
-        for(i = 0; i < 11; i++)
-        {
-            if (!(tempStr[i] == ' ' && tempStr[i+1] == ' '))
-            {
-                fileName[j] = tempStr[i];
-                    j++;
-            }
+        
+        temp = lseek(fd, directory+clusterBytes+28, SEEK_SET);
+        temp2 = read(fd, &size, 4);  
+
+        for(i=0; i<strlen(fileName); i++){
+            if(fileName[i] != name[i])
+                break; 
+            if(fileName[i] == name[i] && i == (strlen(fileName)-1))
+                return size;
         }
-        fileName[j-1] = '\0'; // one trailing blank kept showing up
-        j = 0;
-        if (strcmp(fileName, inputTokens->items[1]) == 0){
-            break;
-        }
+
         temp = lseek(fd, 21, SEEK_CUR);
-        temp2 = read(fd, &empty, 4);
-        n += 64;
-    }
+        temp2 = read(fd, &empty, 4); 
+        clusterBytes+=64; 
 
+        if(clusterBytes >= 512){
+            if(next_cluster_num(fd, currentClusterNum) != -1){
+                currentClusterNum = next_cluster_num(fd, currentClusterNum); 
+                clusterBytes = 32; 
+
+                curDirDataReg = dataStart + 512*(currentClusterNum-2)*bpb_information.bpb_secperclus;
+
+                temp = lseek(fd, curDirDataReg, SEEK_SET);
+                temp2 = read(fd, &empty, 4); 
+            }
+            else{
+                empty = 0; 
+            }   
+        }      
+    }
 }
 
 /*
