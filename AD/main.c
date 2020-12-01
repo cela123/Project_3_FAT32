@@ -308,7 +308,37 @@ int main(){
             }
         }
         if(strcmp(inputTokens->items[0], "open") == 0){
-
+            if(inputTokens->items[1] == NULL){
+                printf("Missing file operand\n"); 
+                continue; 
+            }
+            if(inputTokens->items[2] == NULL){
+                printf("Missing mode operand\n"); 
+                continue;   
+            }
+            //error if name DNE or is for a directory not a file
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10 || find_dir_entry(fd, inputTokens->items[1], currDirectory) == -1){
+                printf("File %s does not exist\n", inputTokens->items[1]); 
+                continue;
+            }    
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20 && inputTokens->items[2] != NULL){
+                if(strcmp(inputTokens->items[2], "r") == 0){
+                    printf("Open %s read only\n", inputTokens->items[1]); 
+                }
+                else if(strcmp(inputTokens->items[2], "w") == 0){
+                    printf("Open %s write only\n", inputTokens->items[1]); 
+                }
+                else if(strcmp(inputTokens->items[2], "rw") == 0){
+                    printf("Open %s read and write\n", inputTokens->items[1]); 
+                }   
+                else if(strcmp(inputTokens->items[2], "wr") == 0){
+                    printf("Open %s write and read\n", inputTokens->items[1]); 
+                }   
+                else{
+                    printf("Invalid mode for open: %s\n", inputTokens->items[2]); 
+                    continue; 
+                }                          
+            }     
         }
         if(strcmp(inputTokens->items[0], "close") == 0){
 
