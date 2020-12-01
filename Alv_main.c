@@ -109,7 +109,6 @@ struct node* deleteOpenFile(char name[11]){
 
 struct openFiles* findOpenFile(char name[11]){
     struct openFiles *current = head;
-    // Empty List
     if (head == NULL){
         return NULL;
     }
@@ -122,7 +121,7 @@ struct openFiles* findOpenFile(char name[11]){
             current = current->next;
         }
     } 
-    return (void *)1;
+    return (void *)current;
 }
 
 //display list
@@ -383,11 +382,15 @@ int main(){
                 printf("Missing destination file operand\n"); 
                 continue; 
             }
-            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20 && find_dir_entry(fd, inputTokens->items[2], currDirectory) == 0x20){
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20 
+                && find_dir_entry(fd, inputTokens->items[2], currDirectory) == 0x20)
+            {
                 printf("The name '%s' is already being used by another file\n", inputTokens->items[2]); 
                 continue;                 
             }
-            if(find_dir_entry(fd, inputTokens->items[2], currDirectory) == 0x20 && find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10){
+            if(find_dir_entry(fd, inputTokens->items[2], currDirectory) == 0x20 
+                && find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10)
+            {
                 printf("Cannot move directory: invalid destination argument\n"); 
                 continue; 
             }
@@ -412,11 +415,15 @@ int main(){
                 continue;   
             }
             //error if name DNE or is for a directory not a file
-            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10 || find_dir_entry(fd, inputTokens->items[1], currDirectory) == -1){
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10 
+                || find_dir_entry(fd, inputTokens->items[1], currDirectory) == -1)
+            {
                 printf("File %s does not exist\n", inputTokens->items[1]); 
                 continue;
             }    
-            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20 && inputTokens->items[2] != NULL){
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20 
+                && inputTokens->items[2] != NULL)
+            {
                 if(strcmp(inputTokens->items[2], "r") == 0){
                     addFile(0, READ, 0, inputTokens->items[1]);
                     printOpenFiles(); 
@@ -446,7 +453,7 @@ int main(){
                 printf("File %s does not exist\n", inputTokens->items[1]); 
                 continue;
             }
-            if(findOpenFile(inputTokens->items[1]) == (void *)1)
+            if(findOpenFile(inputTokens->items[1]) != NULL)
             {
                 deleteOpenFile(inputTokens->items[1]);
                 printOpenFiles();
@@ -455,7 +462,24 @@ int main(){
             }
         }
         if(strcmp(inputTokens->items[0], "lseek") == 0){
-
+            if(findOpenFile(inputTokens->items[1]) != NULL)
+            {
+                while (current->name != NULL)
+                {
+                    if(current->next == NULL)
+                        break;
+                    if(strcmp(current->name, inputTokens->items[1]) == 0)
+                        break;
+                    else {
+                        current = current->next;
+                    }
+                } 
+                // This should update the correct item in the list 
+                current->Offset = atoi(inputTokens->items[2]); //atoi converts the string to an int 
+                printf("%s, %d\n", current->name, current->Offset);
+            } else {
+                printf("File %s has not been opened\n", inputTokens->items[1]);
+            }
         }
         if(strcmp(inputTokens->items[0], "read") == 0){
 
