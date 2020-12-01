@@ -79,7 +79,7 @@ void addFile(int fc, int M, int off, char n[11]){
 	// return head;
 }
 
-struct node* delete(char name[11]){
+struct node* deleteOpenFile(char name[11]){
     struct openFiles *current = head;
     struct openFiles *previous = NULL;
 
@@ -104,7 +104,25 @@ struct node* delete(char name[11]){
     } else {
         previous->next = current->next;
     }
-    return current;
+    return (void *)current;
+}
+
+struct openFiles* findOpenFile(char name[11]){
+    struct openFiles *current = head;
+    // Empty List
+    if (head == NULL){
+        return NULL;
+    }
+
+    while(strcmp(current->name, name))
+    {
+        if(current->next == NULL)
+            return NULL;
+        else {
+            current = current->next;
+        }
+    } 
+    return (void *)1;
 }
 
 //display list
@@ -384,67 +402,57 @@ int main(){
             }
         }
         if(strcmp(inputTokens->items[0], "open") == 0){
-			
-            if (inputTokens->size < 3);
-                printf("Not enough parametes passed\n");
-            else {
-                short n = 32;
-                int size = 0;
-                int type = 0;
-                char tempStr[11];
-                temp = lseek(fd, currDirectory, SEEK_SET);
-                temp2 = read(fd, &empty, 4);
-                if(inputTokens->items[1] == NULL){
-                    printf("No file specificed for size\n");
-                    continue;
+			    
+            if(inputTokens->items[1] == NULL){
+                printf("Missing file operand\n"); 
+                continue; 
+            }
+            if(inputTokens->items[2] == NULL){
+                printf("Missing mode operand\n"); 
+                continue;   
+            }
+            //error if name DNE or is for a directory not a file
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10 || find_dir_entry(fd, inputTokens->items[1], currDirectory) == -1){
+                printf("File %s does not exist\n", inputTokens->items[1]); 
+                continue;
+            }    
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20 && inputTokens->items[2] != NULL){
+                if(strcmp(inputTokens->items[2], "r") == 0){
+                    addFile(0, READ, 0, inputTokens->items[1]);
+                    printOpenFiles(); 
                 }
-                while(empty != 0){
-                    temp = lseek(fd, currDirectory+n, SEEK_SET);
-                    
-                    for(i = 0; i<11; i++){
-                        temp2 = read(fd, &tempStr[i], 1);
-                    }
-                    temp2 = read(fd, &type, 1);				
-                    // Removing trailing blank spaces
-                    for(i = 0; i < 11; i++)
-                    {
-                        if (!(tempStr[i] == ' ' && tempStr[i+1] == ' '))
-                        {
-                            fileName[j] = tempStr[i];
-                            j++;
-                        }
-                    }
-                    fileName[j-1] = '\0'; // one trailing blank kept showing up
-                    j = 0;
-                    if (strcmp(fileName, inputTokens->items[1]) == 0)
-                    {
-                        break;
-                    }
-                    
-                    temp = lseek(fd, 21, SEEK_CUR);
-                    temp2 = read(fd, &empty, 4);
-                    n += 64;
-                } // End of While
-                
-                if (type != 32)
-                    printf("%s is not a file\n", inputTokens->items[1]);
+                else if(strcmp(inputTokens->items[2], "w") == 0){
+                    addFile(0, WRITE, 0, inputTokens->items[1]);
+                    printOpenFiles(); 
+                }
+                else if(strcmp(inputTokens->items[2], "rw") == 0){
+                    addFile(0, READWRITE, 0, inputTokens->items[1]);
+                    printOpenFiles(); 
+                }   
+                else if(strcmp(inputTokens->items[2], "wr") == 0){
+                    addFile(0, WRITEREAD, 0, inputTokens->items[1]);
+                    printOpenFiles(); 
+                }   
                 else{
-                    temp = lseek(fd, currDirectory+n+28, SEEK_SET);
-                    temp2 = read(fd, &size, 4);
-                    printf("%d\n", size);
-                }	
-                    
-                    addFile(0, inputTokens->items[2], 0, inputTokens->items[1]);
-                    printOpenFiles();
-                }
-            
-            
-            
-            
-            
+                    printf("Invalid mode for open: %s\n", inputTokens->items[2]); 
+                    continue; 
+                }                          
+            }     
         }
         if(strcmp(inputTokens->items[0], "close") == 0){
-
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10 || 
+                find_dir_entry(fd, inputTokens->items[1], currDirectory) == -1)
+            {
+                printf("File %s does not exist\n", inputTokens->items[1]); 
+                continue;
+            }
+            if(findOpenFile(inputTokens->items[1]) == (void *)1)
+            {
+                deleteOpenFile(inputTokens->items[1]);
+                printOpenFiles();
+            } else {
+                printf("File not found or doesn't exist\n");
+            }
         }
         if(strcmp(inputTokens->items[0], "lseek") == 0){
 
