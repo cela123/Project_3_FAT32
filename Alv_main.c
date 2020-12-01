@@ -79,7 +79,7 @@ void addFile(int fc, int M, int off, char n[11]){
 	// return head;
 }
 
-struct node* delete(char name[11]){
+struct node* deleteOpenFile(char name[11]){
     struct openFiles *current = head;
     struct openFiles *previous = NULL;
 
@@ -104,7 +104,25 @@ struct node* delete(char name[11]){
     } else {
         previous->next = current->next;
     }
-    return current;
+    return (void *)current;
+}
+
+struct openFiles* findOpenFile(char name[11]){
+    struct openFiles *current = head;
+    // Empty List
+    if (head == NULL){
+        return NULL;
+    }
+
+    while(strcmp(current->name, name))
+    {
+        if(current->next == NULL)
+            return NULL;
+        else {
+            current = current->next;
+        }
+    } 
+    return (void *)1;
 }
 
 //display list
@@ -400,22 +418,18 @@ int main(){
             }    
             if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20 && inputTokens->items[2] != NULL){
                 if(strcmp(inputTokens->items[2], "r") == 0){
-                    printf("Open %s read only\n", inputTokens->items[1]);
                     addFile(0, READ, 0, inputTokens->items[1]);
                     printOpenFiles(); 
                 }
                 else if(strcmp(inputTokens->items[2], "w") == 0){
-                    printf("Open %s write only\n", inputTokens->items[1]);
                     addFile(0, WRITE, 0, inputTokens->items[1]);
                     printOpenFiles(); 
                 }
                 else if(strcmp(inputTokens->items[2], "rw") == 0){
-                    printf("Open %s read and write\n", inputTokens->items[1]);
                     addFile(0, READWRITE, 0, inputTokens->items[1]);
                     printOpenFiles(); 
                 }   
                 else if(strcmp(inputTokens->items[2], "wr") == 0){
-                    printf("Open %s write and read\n", inputTokens->items[1]);
                     addFile(0, WRITEREAD, 0, inputTokens->items[1]);
                     printOpenFiles(); 
                 }   
@@ -426,7 +440,19 @@ int main(){
             }     
         }
         if(strcmp(inputTokens->items[0], "close") == 0){
-
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10 || 
+                find_dir_entry(fd, inputTokens->items[1], currDirectory) == -1)
+            {
+                printf("File %s does not exist\n", inputTokens->items[1]); 
+                continue;
+            }
+            if(findOpenFile(inputTokens->items[1]) == (void *)1)
+            {
+                deleteOpenFile(inputTokens->items[1]);
+                printOpenFiles();
+            } else {
+                printf("File not found or doesn't exist\n");
+            }
         }
         if(strcmp(inputTokens->items[0], "lseek") == 0){
 
