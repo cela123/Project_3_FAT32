@@ -68,11 +68,16 @@ int isCommand(char *);
 int find_dir_entry(int fd, char* dirName, int curDir); 
 
 int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int curCluster); 
+int file_cluster_num(int fd, char fileName[11], int curDir, int firstDataLoc, int curCluster); 
 int next_cluster_num(int fd, unsigned int currentClusterNum); 
 
 int file_size(int fd, char* fileName, int curDir); 
 unsigned int find_empty_cluster(int fd); 
 void create_dir_entry(int type); 
+
+int data_region_loc(int clusterNum); 
+
+void read_file(int fd, char name[11], int readSize, int); 
 
 
 //MAIN STARTS
@@ -404,13 +409,14 @@ int main(){
 
                     current->Offset = offset; 
                     printf("%s, %d\n", current->name, current->Offset);
-                } 
+                }  
                 else{
                 printf("File %s has not been opened\n", inputTokens->items[1]);
                 }
             }
         }
         if(strcmp(inputTokens->items[0], "read") == 0){     //read FILENAME SIZE
+            
             if(inputTokens->items[1] == NULL){
                 printf("Missing file operand\n"); 
                 continue; 
@@ -424,6 +430,40 @@ int main(){
                 printf("File %s does not exist\n", inputTokens->items[1]); 
                 continue;
             }  
+            if(findOpenFile(inputTokens->items[1]) == NULL){
+                printf("File %s is not open\n", inputTokens->items[1]); 
+                continue; 
+            }
+            else{
+                if(findOpenFile(inputTokens->items[1])->Mode == READ || findOpenFile(inputTokens->items[1])->Mode == READWRITE || findOpenFile(inputTokens->items[1])->Mode == WRITEREAD){
+                    //read SIZE bytes at OFFSET
+                    int readSize = atoi(inputTokens->items[2]); 
+                    int fileClusterNum, fileData; 
+                    //if OFFSET + SIZE > file size
+                    if(findOpenFile(inputTokens->items[1])->Offset + readSize > file_size(fd, inputTokens->items[1], currDirectory)){
+                        //read file size - OFFSET starting at OFFSET
+                        printf("having to change read size\n"); 
+                        readSize = file_size(fd, inputTokens->items[1], currDirectory) - findOpenFile(inputTokens->items[1])->Offset; 
+                    }
+                    
+                    fileClusterNum = file_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster); 
+                    
+                    fileData = data_region_loc(fileClusterNum);
+
+                    printf("data for %s starts at %d\n", inputTokens->items[1], fileData);
+
+                    // char test; 
+                    // temp = lseek(fd, fileData, SEEK_SET);
+                    // temp2 = read(fd, &test, 1);
+
+                    read_file(fd, inputTokens->items[1], readSize, fileData); 
+                    findOpenFile(inputTokens->items[1])->Offset += readSize; 
+                }
+                else{
+                    printf("File %s is not open for reading\n", inputTokens->items[1]); 
+                    continue; 
+                }
+            }
 
         }
         if(strcmp(inputTokens->items[0], "write") == 0){    //write FILENAME SIZE "STRING"
@@ -805,6 +845,85 @@ int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int 
     return -1; 
 }
 
+/*
+    Function: file_cluster_num
+    Returns the cluster number for the contents of a given file name in the current directory
+    Will return -1 if no file with provided name can be found
+*/
+int file_cluster_num(int fd, char fileName[11], int curDir, int firstDataLoc, int curCluster){
+    int i; 
+    int clusterBytes = 32;
+    int currentClusterNum = curCluster; 
+    int directory = curDir; 
+    int empty = 0; 
+    off_t temp; 
+    int N = 0; 
+    ssize_t temp2;
+    int type =0; 
+    char name[11]; 
+    temp = lseek(fd, directory, SEEK_SET);
+    temp2 = read(fd, &empty, 4); 
+
+    if(empty == 0)
+        return -1; 
+    while(empty != 0){
+        N = 0; 
+        temp = lseek(fd, directory+clusterBytes, SEEK_SET);
+                
+        for(i=0; i<11; i++){
+            temp2 = read(fd, &name[i], 1);    
+        }
+        //directory or not
+        temp2 = read(fd, &type, 1);  
+        
+        temp = lseek(fd, directory+clusterBytes+26, SEEK_SET);
+        temp2 = read(fd, &N, 2);  
+
+        //type = find_dir_entry(fd, dirName, curDir);
+
+         
+
+        for(i=0; i<strlen(fileName); i++){
+            if(fileName[i] != name[i])
+                break; 
+            if(fileName[i] == name[i] && i == (strlen(fileName)-1))
+                if(type == FILE_ATTRIBUTE){
+                    //printf("found the directory\n"); 
+                    //printf("firstDataLoc: %d\n", firstDataLoc); 
+                    //printf("bpb_information.bpb_secperclus:%d\n", bpb_information.bpb_secperclus); 
+                    return N;
+                }
+                else{
+                    
+                    return -1; 
+                }
+        }
+
+        temp = lseek(fd, 21, SEEK_CUR);
+        temp2 = read(fd, &empty, 4); 
+        clusterBytes+=64; 
+
+        if(clusterBytes >= 512){
+            if(next_cluster_num(fd, currentClusterNum) != -1){
+                currentClusterNum = next_cluster_num(fd, currentClusterNum); 
+                clusterBytes = 32; 
+
+                directory = firstDataLoc + 512*(currentClusterNum-2)*bpb_information.bpb_secperclus;
+
+                temp = lseek(fd, directory, SEEK_SET);
+                temp2 = read(fd, &empty, 4); 
+            }
+            else{
+                empty = 0; 
+            }   
+        }
+        
+        
+    }
+    //printf("%s is not a directory\n", dirName); 
+    return -1; 
+
+}
 
 /*
     Function: next_cluster_num
@@ -909,4 +1028,26 @@ unsigned int find_empty_cluster(int fd){
     }
 
     return emptyClusterNum; 
+}
+/*
+    Function: data_region_loc
+    Returns the data reg location for a given cluster number
+*/
+int data_region_loc(int clusterNum){
+
+    return ((clusterNum-2)*512) + (bpb_information.bpb_bytspersec*(bpb_information.bpb_rsvdseccnt + (bpb_information.bpb_numfats*bpb_information.bpb_fatsz32))); 
+}
+
+void read_file(int fd, char name[11], int readSize, int fileDataRegNum){
+    off_t temp; 
+    ssize_t temp2; 
+    int i; 
+    char dataRead[readSize]; 
+
+    temp = lseek(fd, fileDataRegNum, SEEK_SET);
+    for(i=0; i<readSize; i++){
+        temp2 = read(fd, &dataRead[i], 1);
+    }
+    printf("read: %s\n", dataRead); 
+    
 }
