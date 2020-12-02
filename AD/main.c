@@ -457,7 +457,20 @@ int main(){
                     // temp2 = read(fd, &test, 1);
 
                     read_file(fd, inputTokens->items[1], readSize, fileData); 
-                    findOpenFile(inputTokens->items[1])->Offset += readSize; 
+                    current = head; 
+                    if(findOpenFile(inputTokens->items[1]) != NULL){
+                    while (current->name != NULL){
+                        if(strcmp(current->name, inputTokens->items[1]) == 0)
+                            break;
+                        else{
+                            current = current->next;
+                        }
+                    } 
+
+                    current->Offset += readSize; 
+                    printf("%s, %d\n", current->name, current->Offset);
+                }
+
                 }
                 else{
                     printf("File %s is not open for reading\n", inputTokens->items[1]); 
@@ -1044,7 +1057,7 @@ void read_file(int fd, char name[11], int readSize, int fileDataRegNum){
     int i; 
     char dataRead[readSize]; 
 
-    temp = lseek(fd, fileDataRegNum, SEEK_SET);
+    temp = lseek(fd, fileDataRegNum + findOpenFile(name)->Offset, SEEK_SET);
     for(i=0; i<readSize; i++){
         temp2 = read(fd, &dataRead[i], 1);
     }
