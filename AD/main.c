@@ -1040,6 +1040,10 @@ int data_region_loc(int clusterNum){
     return ((clusterNum-2)*512) + (bpb_information.bpb_bytspersec*(bpb_information.bpb_rsvdseccnt + (bpb_information.bpb_numfats*bpb_information.bpb_fatsz32))); 
 }
 
+/*
+    Function: read_file
+    
+*/
 void read_file(int fd, char fileName[11], int readSize, int fileDataClusterNum){
     off_t temp; 
     ssize_t temp2; 
@@ -1088,3 +1092,4 @@ void read_file(int fd, char fileName[11], int readSize, int fileDataClusterNum){
     dataRead[readSize] = '\0'; 
     printf("read: %s\n", dataRead);   
 }
+
