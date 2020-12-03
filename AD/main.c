@@ -227,7 +227,7 @@ int main(){
         if(strcmp(inputTokens->items[0], "cd") == 0){
             int newDirectoryCluster = 0; 
             if(inputTokens->items[1] == NULL){
-                printf("No directory specified for cd you fucking idiot\n");
+                printf("No directory specified for cd\n");
             }
             else if(strcmp(inputTokens->items[1], "..") == 0 && currDirectory == dataRegStart){
                 printf("No directory '..' for root\n");
