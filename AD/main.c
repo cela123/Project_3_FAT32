@@ -7,7 +7,9 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdint.h>
 #include "parser.h"
+
 
 #define FILE_ATTRIBUTE 0X20
 #define DIRECTORY_ATTRIBUTE 0X10
@@ -79,6 +81,8 @@ int data_region_loc(int clusterNum);
 
 void read_file(int fd, char name[11], int readSize, int); 
 
+void write_to_file(int fd, char fileName[11], int sizeOfWrite, char* stringFromInput, int curDir, int fileDataClusterNum); 
+
 
 //MAIN STARTS
 int main(){
@@ -96,7 +100,7 @@ int main(){
     int currDirectoryCluster; 
     //------------------------------------
 
-    int fd = open("fat32.img", O_RDONLY);
+    int fd = open("fat32.img", O_RDWR);
     if (fd == -1)
         printf("Error opening file");
 
@@ -108,9 +112,10 @@ int main(){
     currDirectoryCluster = bpb_information.bpb_rootclus; 
     //printf("Data Region Start = %d\n", dataRegStart); 
     //printf("Root Cluster = %d\n", currDirectoryCluster); 
-
     while(1){
+        
 
+        
         printf("$ ");
         char* input = get_input();
 		tokenlist *inputTokens = get_tokens(input);
@@ -469,6 +474,8 @@ int main(){
 
         }
         if(strcmp(inputTokens->items[0], "write") == 0){    //write FILENAME SIZE "STRING"
+            int writeSize = 0; 
+            
             if(inputTokens->items[1] == NULL){
                 printf("Missing file operand\n"); 
                 continue; 
@@ -476,16 +483,38 @@ int main(){
             if(inputTokens->items[2] == NULL){
                 printf("Missing size operand\n"); 
                 continue;   
-            }       
+            }  
+            else{
+                writeSize = atoi(inputTokens->items[2]); 
+            }     
             if(inputTokens->items[3] == NULL){
                 printf("Missing string to write to %s\n", inputTokens->items[1]); 
                 continue;   
-            }                 
+            }          
             //error if name DNE or is for a directory not a file
             if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10 || find_dir_entry(fd, inputTokens->items[1], currDirectory) == -1){
                 printf("File %s does not exist\n", inputTokens->items[1]); 
                 continue;
             } 
+            if(findOpenFile(inputTokens->items[1]) == NULL){
+                printf("File %s is not open\n", inputTokens->items[1]); 
+                continue;
+            }
+            if(findOpenFile(inputTokens->items[1])->Offset > file_size(fd, inputTokens->items[1], currDirectory)){
+                printf("Offset is larger than file size\n"); 
+                continue; 
+            }
+            if(findOpenFile(inputTokens->items[1])->Mode == READ){
+                printf("File %s is not open for writing\n", inputTokens->items[1]); 
+                continue; 
+
+            }
+            else{
+                int fileClusterNum; 
+                fileClusterNum = file_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster);
+                write_to_file(fd, inputTokens->items[1], writeSize, inputTokens->items[3], currDirectory, fileClusterNum); 
+            }
+            
         }
         if(strcmp(inputTokens->items[0], "rm") == 0){       //rm FILENAME
             if(inputTokens->items[1] == NULL){
@@ -1091,5 +1120,87 @@ void read_file(int fd, char fileName[11], int readSize, int fileDataClusterNum){
     }
     dataRead[readSize] = '\0'; 
     printf("read: %s\n", dataRead);   
+}
+
+void write_to_file(int fd, char fileName[11], int sizeOfWrite, char* stringFromInput, int curDir, int fileDataClusterNum){
+    off_t temp; 
+    ssize_t temp2; 
+    //uint8_t buff[1]; 
+    char stringToWrite[sizeOfWrite+1]; 
+    int i;
+    int counter = 0;  
+
+    int sizeOfFile = file_size(fd, fileName, curDir); 
+    //int fileDataClusterNum = findOpenFile(fileName)->firClust; 
+    int clusterForData = fileDataClusterNum; 
+    int fileDataRegNum = data_region_loc(fileDataClusterNum); 
+    int offsetAtCluster = findOpenFile(fileName)->Offset; 
+
+    int currentNumClusters, finalNumClusters, extraClusters;  
+
+    //determining start point for write
+    while(offsetAtCluster > bpb_information.bpb_bytspersec){
+        offsetAtCluster -=  bpb_information.bpb_bytspersec; 
+        clusterForData = next_cluster_num(fd, fileDataClusterNum); 
+        fileDataRegNum = data_region_loc(clusterForData); 
+    }    
+
+    //creating string to write
+    for(i = 0; i<sizeOfWrite; i++){
+        if(i >= strlen(stringFromInput)-2)
+            stringToWrite[i] = '\0'; 
+        else
+            stringToWrite[i] = stringFromInput[i+1]; 
+    }
+    stringToWrite[sizeOfWrite] = '\0'; 
+    printf("string to write: %s\n", stringToWrite); 
+
+    //determining if extra clusters are needed
+    if((findOpenFile(fileName)->Offset + sizeOfWrite) > sizeOfFile){
+        printf("extra clusters must be allocated for write\n"); 
+        //filesize / bytes_per_cluster
+        currentNumClusters = sizeOfFile / (bpb_information.bpb_bytspersec * bpb_information.bpb_secperclus); 
+        if(sizeOfFile%(bpb_information.bpb_bytspersec * bpb_information.bpb_secperclus) >0)
+            currentNumClusters ++; 
+        finalNumClusters = (findOpenFile(fileName)->Offset + sizeOfWrite) / (bpb_information.bpb_bytspersec * bpb_information.bpb_secperclus); 
+        if((findOpenFile(fileName)->Offset + sizeOfWrite) % (bpb_information.bpb_bytspersec * bpb_information.bpb_secperclus) > 0)
+            finalNumClusters++; 
+        extraClusters = finalNumClusters - currentNumClusters; 
+        printf("need to allocate %d extra clusters\n", extraClusters); 
+    }
+    
+    printf("location to start write: %d\n", fileDataRegNum + offsetAtCluster); 
+    temp = lseek(fd, fileDataRegNum + offsetAtCluster, SEEK_SET);
+    //writing string to file
+    for(i=0; i<sizeOfWrite; i++){
+        //printf("%c\n", stringToWrite[i]); 
+        //buff = stringToWrite[i]; 
+        write(fd, &stringToWrite[i], 1);
+
+        //increasing the offset for file by 1 as each byte is written
+        current = head; 
+        if(findOpenFile(fileName) != NULL){
+            while (current->name != NULL){
+                if(strcmp(current->name, fileName) == 0)
+                    break;
+                else{
+                    current = current->next;
+                }
+            } 
+
+            current->Offset++; 
+        }
+        //if write reaches the end of one cluster
+        if(i+offsetAtCluster == (counter*bpb_information.bpb_bytspersec)-1){
+            counter++; 
+            clusterForData = next_cluster_num(fd, clusterForData); 
+            fileDataRegNum = data_region_loc(clusterForData);
+            offsetAtCluster = 0; 
+            temp = lseek(fd, fileDataRegNum, SEEK_SET);  
+            printf("next cluster is in data region at: %d\n", fileDataRegNum); 
+        }
+    }
+
+
 }
 
