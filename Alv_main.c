@@ -67,7 +67,7 @@ void printOpenFiles();
 int isCommand(char *); 
 int find_dir_entry(int fd, char* dirName, int curDir); 
 
-int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int curCluster); 
+int dir_cluster_num(int fd, char dirName[11], unsigned int curDir, unsigned int firstDataLoc, unsigned int curCluster); 
 int file_cluster_num(int fd, char fileName[11], int curDir, int firstDataLoc, int curCluster); 
 int next_cluster_num(int fd, unsigned int currentClusterNum); 
 
@@ -81,12 +81,11 @@ void read_file(int fd, char name[11], int readSize, int);
 
 
 //MAIN STARTS
-int main(){
+int main(int argc, char *argv[]){
     off_t temp; 
     ssize_t temp2;
 
-    unsigned int dataRegStart; 
-    int test; 
+    unsigned int dataRegStart;  
     int i, j; 
     char fileName[11], tempstr[11]; 
     unsigned int empty =0; 
@@ -100,7 +99,7 @@ int main(){
     int currDirectoryCluster; 
     //------------------------------------
 
-    int fd = open("fat32.img", O_RDWR); //Read and Write
+    int fd = open(argv[1], O_RDWR); //Read and Write
     if (fd == -1)
         printf("Error opening file");
 
@@ -168,7 +167,6 @@ int main(){
             }       
             temp = lseek(fd, directory, SEEK_SET);
             temp2 = read(fd, &empty, 4); 
-            printf("Empty = %d\n", empty);
 
             //reading "." for directories not the root
             if((currDirectory != dataRegStart) && empty != 0){
@@ -194,7 +192,6 @@ int main(){
             }
                 
             while(empty != 0){  
-                printf("Empty = %x\n", empty);
                 empty = 0; 
                 temp = lseek(fd, directory+clusterBytes, SEEK_SET);
                 
@@ -243,7 +240,7 @@ int main(){
             printf("\n"); 
         }
         if(strcmp(inputTokens->items[0], "cd") == 0){
-            int newDirectoryCluster = 0; 
+            unsigned int newDirectoryCluster = 0; 
             if(inputTokens->items[1] == NULL){
                 printf("No directory specified for cd\n");
             }
@@ -251,7 +248,6 @@ int main(){
                 printf("No directory '..' for root\n");
             }
             else{
-
                 newDirectoryCluster = dir_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster);
                 if(newDirectoryCluster == -1)
                     printf("%s is not a directory\n", inputTokens->items[1]); 
@@ -574,8 +570,8 @@ int main(){
                 } // End of While
                 temp = lseek(fd, directory+clusterBytes-32, SEEK_SET);
                 temp2 = write(fd, E5, 1);
-                temp2 = write(fd, emptyCluster, 3);
-                for (i = 0; i < 16; i++)
+                temp2 = write(fd, emptyCluster, 3); // REMEMBER THIS VALUE WAS 3
+                for (i = 0; i < 15; i++)
                 {
                     temp2 = write(fd, emptyCluster, 4);   
                 }
@@ -851,13 +847,13 @@ int find_dir_entry(int fd, char* dirEntryName, int curDir){
     Returns the cluster number for a given directory name in the current directory
     Will return -1 if no directory with provided name can be found
 */
-int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int curCluster){
+int dir_cluster_num(int fd, char dirName[11], unsigned int curDir, unsigned int firstDataLoc, unsigned int curCluster){
 
     int i; 
     int clusterBytes = 32;
-    int currentClusterNum = curCluster; 
-    int directory = curDir; 
-    int empty = 0; 
+    unsigned int currentClusterNum = curCluster; 
+    unsigned int directory = curDir; 
+    unsigned int empty = 0; 
     off_t temp; 
     int N = 0; 
     ssize_t temp2;
@@ -867,7 +863,11 @@ int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int 
     temp2 = read(fd, &empty, 4); 
 
     if(empty == 0)
-        return -1; 
+    {
+        printf("Empty == 0\n");
+        return -1;
+    }
+         
     while(empty != 0){
         N = 0; 
         temp = lseek(fd, directory+clusterBytes, SEEK_SET);
@@ -880,9 +880,6 @@ int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int 
         
         temp = lseek(fd, directory+clusterBytes+26, SEEK_SET);
         temp2 = read(fd, &N, 2);  
-
-        //type = find_dir_entry(fd, dirName, curDir);
-
          
 
         for(i=0; i<strlen(dirName); i++){
@@ -890,18 +887,14 @@ int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int 
                 break; 
             if(dirName[i] == name[i] && i == (strlen(dirName)-1))
                 if(type == 16){
-                    //printf("found the directory\n"); 
-                    //printf("firstDataLoc: %d\n", firstDataLoc); 
-                    //printf("bpb_information.bpb_secperclus:%d\n", bpb_information.bpb_secperclus); 
                     return N;
                 }
                 else{
-                    
                     return -1; 
                 }
         }
 
-        temp = lseek(fd, 21, SEEK_CUR);
+        temp = lseek(fd, directory+clusterBytes+32, SEEK_SET);
         temp2 = read(fd, &empty, 4); 
         clusterBytes+=64; 
 
@@ -918,11 +911,8 @@ int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int 
             else{
                 empty = 0; 
             }   
-        }
-        
-        
-    }
-    //printf("%s is not a directory\n", dirName); 
+        }   
+    } 
     return -1; 
 }
 
