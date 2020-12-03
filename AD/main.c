@@ -1044,18 +1044,25 @@ void read_file(int fd, char fileName[11], int readSize, int fileDataClusterNum){
     off_t temp; 
     ssize_t temp2; 
     int i; 
+    int counter = 1; 
     int fileDataRegNum = data_region_loc(fileDataClusterNum); 
-    char dataRead[readSize]; 
+    int clusterForData = fileDataClusterNum; 
+    int offsetAtCluster = findOpenFile(fileName)->Offset; 
+    char dataRead[readSize+1]; 
 
 
-    if(findOpenFile(fileName)->Offset > bpb_information.bpb_bytspersec){
-        
+    while(offsetAtCluster > bpb_information.bpb_bytspersec){
+        offsetAtCluster -=  bpb_information.bpb_bytspersec; 
+        clusterForData = next_cluster_num(fd, fileDataClusterNum); 
+        fileDataRegNum = data_region_loc(clusterForData); 
     }
-    printf("offset: %d\n",findOpenFile(fileName)->Offset); 
-    temp = lseek(fd, fileDataRegNum + findOpenFile(fileName)->Offset, SEEK_SET);
+
+    temp = lseek(fd, fileDataRegNum + offsetAtCluster, SEEK_SET);
+
     for(i=0; i<readSize; i++){
         temp2 = read(fd, &dataRead[i], 1);
 
+        //increasing the offset for file by 1 as each byte is read
         current = head; 
         if(findOpenFile(fileName) != NULL){
             while (current->name != NULL){
@@ -1067,15 +1074,17 @@ void read_file(int fd, char fileName[11], int readSize, int fileDataClusterNum){
             } 
 
             current->Offset++; 
-            printf("%s, %d\n", current->name, current->Offset);
         }
-
-        if((i +findOpenFile(fileName)->Offset) >= bpb_information.bpb_bytspersec){
-            
-            fileDataRegNum = data_region_loc(next_cluster_num(fd, fileDataClusterNum)); 
+        //if read reaches the end of one cluster
+        if(i+offsetAtCluster ==  (counter*bpb_information.bpb_bytspersec)-1){
+            counter++; 
+            clusterForData = next_cluster_num(fd, clusterForData); 
+            fileDataRegNum = data_region_loc(clusterForData);
+            offsetAtCluster = 0; 
+            lseek(fd, fileDataRegNum, SEEK_SET);  
             printf("next cluster is in data region at: %d\n", fileDataRegNum); 
         }
     }
-    printf("read: %s\n", dataRead); 
-    
+    dataRead[readSize] = '\0'; 
+    printf("read: %s\n", dataRead);   
 }
