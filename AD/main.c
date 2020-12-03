@@ -456,20 +456,9 @@ int main(){
                     // temp = lseek(fd, fileData, SEEK_SET);
                     // temp2 = read(fd, &test, 1);
 
-                    read_file(fd, inputTokens->items[1], readSize, fileData); 
-                    current = head; 
-                    if(findOpenFile(inputTokens->items[1]) != NULL){
-                    while (current->name != NULL){
-                        if(strcmp(current->name, inputTokens->items[1]) == 0)
-                            break;
-                        else{
-                            current = current->next;
-                        }
-                    } 
+                    read_file(fd, inputTokens->items[1], readSize, fileClusterNum); 
 
-                    current->Offset += readSize; 
-                    printf("%s, %d\n", current->name, current->Offset);
-                }
+                    
 
                 }
                 else{
@@ -1051,15 +1040,41 @@ int data_region_loc(int clusterNum){
     return ((clusterNum-2)*512) + (bpb_information.bpb_bytspersec*(bpb_information.bpb_rsvdseccnt + (bpb_information.bpb_numfats*bpb_information.bpb_fatsz32))); 
 }
 
-void read_file(int fd, char name[11], int readSize, int fileDataRegNum){
+void read_file(int fd, char fileName[11], int readSize, int fileDataClusterNum){
     off_t temp; 
     ssize_t temp2; 
     int i; 
+    int fileDataRegNum = data_region_loc(fileDataClusterNum); 
     char dataRead[readSize]; 
 
-    temp = lseek(fd, fileDataRegNum + findOpenFile(name)->Offset, SEEK_SET);
+
+    if(findOpenFile(fileName)->Offset > bpb_information.bpb_bytspersec){
+        
+    }
+    printf("offset: %d\n",findOpenFile(fileName)->Offset); 
+    temp = lseek(fd, fileDataRegNum + findOpenFile(fileName)->Offset, SEEK_SET);
     for(i=0; i<readSize; i++){
         temp2 = read(fd, &dataRead[i], 1);
+
+        current = head; 
+        if(findOpenFile(fileName) != NULL){
+            while (current->name != NULL){
+                if(strcmp(current->name, fileName) == 0)
+                    break;
+                else{
+                    current = current->next;
+                }
+            } 
+
+            current->Offset++; 
+            printf("%s, %d\n", current->name, current->Offset);
+        }
+
+        if((i +findOpenFile(fileName)->Offset) >= bpb_information.bpb_bytspersec){
+            
+            fileDataRegNum = data_region_loc(next_cluster_num(fd, fileDataClusterNum)); 
+            printf("next cluster is in data region at: %d\n", fileDataRegNum); 
+        }
     }
     printf("read: %s\n", dataRead); 
     
