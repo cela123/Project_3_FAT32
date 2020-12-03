@@ -1,0 +1,27 @@
+# Project_3_FAT32
+COP4610 Project 1 - Shell Implementation
+
+Team Members: Aria Delmar, Alec Amico, Alvaro Reyes
+
+Division of Labor:
+
+
+Contents of tar archive:
+    makefile - compiles all of the program files into a single executable "shell". 
+
+    main.c - Prompts the user for new commands/input from the user and calls the appropriate functions based on the
+              the user's input. Shell.c also keeps track of the number of background processes and the total number
+              of commands executed since the program started. 
+
+    parser.h - Header file for parser.c
+
+    parser.c - Implementation of parsing functions that allow for input to be easily
+               tokenized. 
+
+How to compile executables with Makefile
+    When the makefile is run with "make" the executable "project3" will be created. The executable will launch the program. 
+
+Known bugs/unfinished project parts:
+     
+
+Extra credit documentation:

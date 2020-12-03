@@ -257,6 +257,7 @@ int main(){
         }
         if(strcmp(inputTokens->items[0], "creat") == 0){
             int newFileCluster = 0; 
+            int fatLoc = 0; 
             
             if(inputTokens->items[1] == NULL){
                 printf("Missing operand for creat\n"); 
@@ -271,6 +272,9 @@ int main(){
             else{
                 printf("creating new file\n"); 
                 newFileCluster = find_empty_cluster(fd); 
+                fatLoc = newFileCluster*4 + (bpb_information.bpb_rsvdseccnt * bpb_information.bpb_bytspersec*bpb_information.bpb_secperclus); 
+                printf("cluster num: %d\t%x\n", newFileCluster, newFileCluster); 
+                printf("location in fat: %d\t%x\n", fatLoc, fatLoc); 
                 temp = lseek(fd, -4, SEEK_CUR);
                 //write(fd, 0xFFFFFFFF, 4);
             }
@@ -475,7 +479,9 @@ int main(){
         }
         if(strcmp(inputTokens->items[0], "write") == 0){    //write FILENAME SIZE "STRING"
             int writeSize = 0; 
-            
+            int i = 0; 
+            char * fullString = NULL; 
+            int memAlloc = 0; 
             if(inputTokens->items[1] == NULL){
                 printf("Missing file operand\n"); 
                 continue; 
@@ -490,7 +496,22 @@ int main(){
             if(inputTokens->items[3] == NULL){
                 printf("Missing string to write to %s\n", inputTokens->items[1]); 
                 continue;   
-            }          
+            } 
+            else{
+                i=3; 
+                while(inputTokens->items[i] != NULL){
+                    if(memAlloc == 0){
+                        fullString =(char*)malloc(strlen(inputTokens->items[i]) + 1); 
+                        sprintf(fullString, "%s", inputTokens->items[i]); 
+                        memAlloc = 1; 
+                    }
+                    else{
+                        fullString = (char*)realloc(fullString, strlen(fullString)+ strlen(inputTokens->items[i]) + 3); 
+                        sprintf(fullString, "%s %s", fullString, inputTokens->items[i]); 
+                    }
+                    i++; 
+                }
+            }         
             //error if name DNE or is for a directory not a file
             if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10 || find_dir_entry(fd, inputTokens->items[1], currDirectory) == -1){
                 printf("File %s does not exist\n", inputTokens->items[1]); 
@@ -500,6 +521,7 @@ int main(){
                 printf("File %s is not open\n", inputTokens->items[1]); 
                 continue;
             }
+            
             if(findOpenFile(inputTokens->items[1])->Offset > file_size(fd, inputTokens->items[1], currDirectory)){
                 printf("Offset is larger than file size\n"); 
                 continue; 
@@ -512,7 +534,12 @@ int main(){
             else{
                 int fileClusterNum; 
                 fileClusterNum = file_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster);
-                write_to_file(fd, inputTokens->items[1], writeSize, inputTokens->items[3], currDirectory, fileClusterNum); 
+                if(fullString[0] == '"' && fullString[strlen(fullString)-1] == '"')
+                    write_to_file(fd, inputTokens->items[1], writeSize, fullString, currDirectory, fileClusterNum); 
+                else{
+                    printf("Improper syntax used for string to write\n"); 
+                    continue; 
+                }
             }
             
         }
@@ -833,8 +860,6 @@ int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int 
 
         //type = find_dir_entry(fd, dirName, curDir);
 
-         
-
         for(i=0; i<strlen(dirName); i++){
             if(dirName[i] != name[i])
                 break; 
@@ -851,7 +876,7 @@ int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int 
                 }
         }
 
-        temp = lseek(fd, 21, SEEK_CUR);
+        temp = lseek(fd, directory+clusterBytes+32, SEEK_SET);
         temp2 = read(fd, &empty, 4); 
         clusterBytes+=64; 
 
@@ -1057,6 +1082,7 @@ unsigned int find_empty_cluster(int fd){
         emptyClusterNum++; 
         //printf("emptuCluster: %d\n", emptyCluster); 
     }
+    emptyClusterNum +=2; 
 
     return emptyClusterNum; 
 }
@@ -1081,7 +1107,7 @@ void read_file(int fd, char fileName[11], int readSize, int fileDataClusterNum){
     int fileDataRegNum = data_region_loc(fileDataClusterNum); 
     int clusterForData = fileDataClusterNum; 
     int offsetAtCluster = findOpenFile(fileName)->Offset; 
-    char dataRead[readSize+1]; 
+    char dataRead[readSize+1]; //+1 if including null char
 
 
     while(offsetAtCluster > bpb_information.bpb_bytspersec){
@@ -1126,7 +1152,7 @@ void write_to_file(int fd, char fileName[11], int sizeOfWrite, char* stringFromI
     off_t temp; 
     ssize_t temp2; 
     //uint8_t buff[1]; 
-    char stringToWrite[sizeOfWrite+1]; 
+    char stringToWrite[sizeOfWrite]; //+1 for null char
     int i;
     int counter = 0;  
 
@@ -1148,12 +1174,12 @@ void write_to_file(int fd, char fileName[11], int sizeOfWrite, char* stringFromI
     //creating string to write
     for(i = 0; i<sizeOfWrite; i++){
         if(i >= strlen(stringFromInput)-2)
-            stringToWrite[i] = '\0'; 
+            stringToWrite[i] = 0; 
         else
             stringToWrite[i] = stringFromInput[i+1]; 
     }
-    stringToWrite[sizeOfWrite] = '\0'; 
-    printf("string to write: %s\n", stringToWrite); 
+    //stringToWrite[sizeOfWrite] = '\0'; 
+    //printf("string to write: %s\n", stringToWrite); 
 
     //determining if extra clusters are needed
     if((findOpenFile(fileName)->Offset + sizeOfWrite) > sizeOfFile){
@@ -1197,7 +1223,7 @@ void write_to_file(int fd, char fileName[11], int sizeOfWrite, char* stringFromI
             fileDataRegNum = data_region_loc(clusterForData);
             offsetAtCluster = 0; 
             temp = lseek(fd, fileDataRegNum, SEEK_SET);  
-            printf("next cluster is in data region at: %d\n", fileDataRegNum); 
+            //printf("next cluster is in data region at: %d\n", fileDataRegNum); 
         }
     }
 
