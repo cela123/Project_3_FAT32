@@ -867,9 +867,9 @@ int create(char* name, int dirCheck, int fd, int dataRegStart, int currDirectory
       unsigned short ClusterLo = empClusNumber&0x0000FFFF;
       for (int i= 0, j =0; i < 64; i++)
       {
-          if(i < 32)//Ignored region wil be all 0xF
+          if(i < 32)
           directory[i] = 0xFF;
-          else if(i >= 32 && i <= 32+10)//Direcotry name
+          else if(i >= 32 && i <= 32+10)
           {
             directory[i] = name[j];
             j++;
@@ -878,7 +878,7 @@ int create(char* name, int dirCheck, int fd, int dataRegStart, int currDirectory
             directory[i] = attr;
           else if(i >= 32+12 && i < 32+20)
             directory[i] = 0x00;
-          else if(i == 32+20) //Fst Clus Hi bot
+          else if(i == 32+20)
           {
             if(dirCheck == 0)
             {
@@ -889,7 +889,7 @@ int create(char* name, int dirCheck, int fd, int dataRegStart, int currDirectory
               directory[i] = 0x00;
             }
           }
-          else if(i == 32 + 21) //Fst CLus hi top
+          else if(i == 32 + 21)
           {
             if(dirCheck == 0)
             {
@@ -975,9 +975,9 @@ int create(char* name, int dirCheck, int fd, int dataRegStart, int currDirectory
 
         for (int i= 0, j =0; i < 64; i++)
         {
-          if(i < 32)//Ignored region wil be all 0xF
+          if(i < 32)
           directory[i] = 0xFF;
-          else if(i >= 32 && i <= 32+10)//Direcotry name
+          else if(i >= 32 && i <= 32+10)
           {
             directory[i] = name[j];
             j++;
@@ -986,7 +986,7 @@ int create(char* name, int dirCheck, int fd, int dataRegStart, int currDirectory
             directory[i] = attr;
           else if(i >= 32+12 && i < 32+20)
             directory[i] = 0x00;
-          else if(i == 32+20) //Fst Clus Hi bot
+          else if(i == 32+20)
           {
             if(dirCheck == 0)
             {
@@ -997,7 +997,7 @@ int create(char* name, int dirCheck, int fd, int dataRegStart, int currDirectory
               directory[i] = 0x00;
             }
           }
-          else if(i == 32 + 21) //Fst CLus hi top
+          else if(i == 32 + 21)
           {
             if(dirCheck == 0)
             {
