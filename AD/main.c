@@ -73,6 +73,8 @@ int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int 
 int file_cluster_num(int fd, char fileName[11], int curDir, int firstDataLoc, int curCluster); 
 int next_cluster_num(int fd, unsigned int currentClusterNum); 
 
+int last_cluster_num(intfd, int currentClusterNum); 
+
 int file_size(int fd, char* fileName, int curDir); 
 unsigned int find_empty_cluster(int fd); 
 void create_dir_entry(int type); 
@@ -85,7 +87,7 @@ void write_to_file(int fd, char fileName[11], int sizeOfWrite, char* stringFromI
 
 
 //MAIN STARTS
-int main(){
+int main(int argc, char *argv[]){
     off_t temp; 
     ssize_t temp2;
 
@@ -100,7 +102,7 @@ int main(){
     int currDirectoryCluster; 
     //------------------------------------
 
-    int fd = open("fat32.img", O_RDWR);
+    int fd = open(argv[1], O_RDWR);
     if (fd == -1)
         printf("Error opening file");
 
@@ -258,6 +260,7 @@ int main(){
         if(strcmp(inputTokens->items[0], "creat") == 0){
             int newFileCluster = 0; 
             int fatLoc = 0; 
+            unsigned int noMoreClusters = 0x0FFFFFFF; 
             
             if(inputTokens->items[1] == NULL){
                 printf("Missing operand for creat\n"); 
@@ -276,7 +279,8 @@ int main(){
                 printf("cluster num: %d\t%x\n", newFileCluster, newFileCluster); 
                 printf("location in fat: %d\t%x\n", fatLoc, fatLoc); 
                 temp = lseek(fd, -4, SEEK_CUR);
-                //write(fd, 0xFFFFFFFF, 4);
+                
+                write(fd, &noMoreClusters, 4);
             }
         }
         if(strcmp(inputTokens->items[0], "mkdir") == 0){
@@ -1005,6 +1009,31 @@ int next_cluster_num(int fd, unsigned int currentClusterNum){
     } 
 }
 
+/*
+    Function: last_cluster_num
+    Returns the last cluster number for the data for the current cluster
+    
+*/
+int last_cluster_num(int fd, int currentClusterNum){
+    int curCluster = currentClusterNum; 
+    int nextCluster = 0; 
+
+    nextCluster = next_cluster_num(fd, currentClusterNum); 
+
+    if(nextCluster >= 0x0FFFFFFF)
+        return curCluster; 
+    else
+        curCluster = nextCluster; 
+    while(nextCluster < 0x0FFFFFFF){
+        nextCluster = next_cluster_num(fd, currentClusterNum); 
+
+        if(nextCluster >= 0x0FFFFFFF)
+            return curCluster; 
+        else
+            curCluster = nextCluster; 
+    }
+    return -1; 
+}
 
 int file_size(int fd, char* fileName, int curDir){
     off_t temp;
@@ -1120,7 +1149,7 @@ void read_file(int fd, char fileName[11], int readSize, int fileDataClusterNum){
 
     for(i=0; i<readSize; i++){
         temp2 = read(fd, &dataRead[i], 1);
-
+        printf("%c", dataRead[i]); 
         //increasing the offset for file by 1 as each byte is read
         current = head; 
         if(findOpenFile(fileName) != NULL){
@@ -1144,8 +1173,9 @@ void read_file(int fd, char fileName[11], int readSize, int fileDataClusterNum){
             printf("next cluster is in data region at: %d\n", fileDataRegNum); 
         }
     }
-    dataRead[readSize] = '\0'; 
-    printf("read: %s\n", dataRead);   
+    //dataRead[readSize] = '\0'; 
+    //printf("read: %s\n", dataRead);  
+    printf("\n");  
 }
 
 void write_to_file(int fd, char fileName[11], int sizeOfWrite, char* stringFromInput, int curDir, int fileDataClusterNum){
@@ -1192,7 +1222,10 @@ void write_to_file(int fd, char fileName[11], int sizeOfWrite, char* stringFromI
         if((findOpenFile(fileName)->Offset + sizeOfWrite) % (bpb_information.bpb_bytspersec * bpb_information.bpb_secperclus) > 0)
             finalNumClusters++; 
         extraClusters = finalNumClusters - currentNumClusters; 
-        printf("need to allocate %d extra clusters\n", extraClusters); 
+        printf("need to allocate %d extra clusters\n", extraClusters);
+
+        
+
     }
     
     printf("location to start write: %d\n", fileDataRegNum + offsetAtCluster); 
@@ -1212,8 +1245,7 @@ void write_to_file(int fd, char fileName[11], int sizeOfWrite, char* stringFromI
                 else{
                     current = current->next;
                 }
-            } 
-
+            }
             current->Offset++; 
         }
         //if write reaches the end of one cluster
