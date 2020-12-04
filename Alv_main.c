@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdint.h>
 #include "parser.h"
 
 #define FILE_ATTRIBUTE 0X20
@@ -59,15 +60,9 @@ struct openFiles *current = NULL;
 //Function Declarations
 void gather_info(int fd);
 void print_info();
-void addFile(int fc, int M, int off, char n[11]); 
-struct node* deleteOpenFile(char name[11]); 
-struct openFiles* findOpenFile(char name[11]); 
-void printOpenFiles(); 
-
 int isCommand(char *); 
 int find_dir_entry(int fd, char* dirName, int curDir); 
 int create(char* name, int dirCheck, int fd, int dataRegStart, int currDirectoryCluster);
-
 
 int dir_cluster_num(int fd, char dirName[11], unsigned int curDir, unsigned int firstDataLoc, unsigned int curCluster); 
 int file_cluster_num(int fd, char fileName[11], int curDir, int firstDataLoc, int curCluster); 
@@ -82,6 +77,11 @@ int data_region_loc(int clusterNum);
 
 void read_file(int fd, char name[11], int readSize, int); 
 
+// List Functions
+void addFile(int fc, int M, int off, char n[11]); 
+struct node* deleteOpenFile(char name[11]); 
+struct openFiles* findOpenFile(char name[11]); 
+void printOpenFiles(); 
 
 //MAIN STARTS
 int main(int argc, char *argv[]){
@@ -511,7 +511,7 @@ int main(int argc, char *argv[]){
                         printf("having to change read size\n"); 
                         readSize = file_size(fd, inputTokens->items[1], currDirectory) - findOpenFile(inputTokens->items[1])->Offset; 
                     }
-                    
+              
                     fileClusterNum = file_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster); 
                     
                     fileData = data_region_loc(fileClusterNum);
@@ -562,7 +562,7 @@ int main(int argc, char *argv[]){
                 continue;
             } 
             if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10 || find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20)  {
-                memset(fileName,' ',sizeof(tempstr));
+                memset(fileName,' ',sizeof(fileName));
                 memset(tempstr,' ',sizeof(tempstr));
                 j = 0;
                 clusterBytes = 32;
@@ -1136,6 +1136,7 @@ int file_size(int fd, char* fileName, int curDir){
     Reads through the FAT until the first empty cluster is found
     Re
 */
+
 unsigned int find_empty_cluster(int fd, int dataRegStart){
     int fatregionstart = 0x4000;    //start at fatreg
     int clusterNumber;
@@ -1149,14 +1150,13 @@ unsigned int find_empty_cluster(int fd, int dataRegStart){
 
         if(clusterNumber == 0x0)
         {
-            printf("%d\n", i);
+            // printf("%d\n", i);
             return fatregionstart + (i * 4);
         }
 
     }
     return -1;
 }
-
 
 int create(char* name, int dirCheck, int fd, int dataRegStart, int currDirectoryCluster){
 
@@ -1165,51 +1165,52 @@ int create(char* name, int dirCheck, int fd, int dataRegStart, int currDirectory
     off_t temp;
     ssize_t temp2;
     int fatregionstart = 0x4000;
-    int empty = 0, empty2 = 0, found_space = 0, first_run = 0, i = 0, j = 0;
-    int offset, offset2, clustNum, saveoffset;
+    int empty = 0, empty2 = 0, found_space = 0, first_run = 0, i = 0, j =0;
+    int offset, offset2, clustNum, saveoffset, firstOffset;
+    
     int oldDirectoryCluster = currDirectoryCluster;
-    int firstOffset;
 
     while(1) {    //search for empty space
 
-        if(first_run == 0)
-        {
-            offset = ((((currDirectoryCluster-2) * bpb_information.bpb_secperclus) + theFirstDataSector) * bpb_information.bpb_bytspersec);
-            firstOffset = offset;
-        }
-        else
-        {
-            currDirectoryCluster = (next_cluster_num(fd, currDirectoryCluster));
-            offset = ((((currDirectoryCluster-2) * bpb_information.bpb_secperclus) + theFirstDataSector) * bpb_information.bpb_bytspersec);
-        }
+      if(first_run == 0)
+      {
+        offset = ((((currDirectoryCluster-2) * bpb_information.bpb_secperclus) + theFirstDataSector) * bpb_information.bpb_bytspersec);
+        firstOffset = offset;
+      }
+      else
+      {
+        currDirectoryCluster = (next_cluster_num(fd, currDirectoryCluster));
+        offset = ((((currDirectoryCluster-2) * bpb_information.bpb_secperclus) + theFirstDataSector) * bpb_information.bpb_bytspersec);
+      }
 
-        first_run++;
+      first_run++;
 
-        for(i = 0; i * 64 < 512; i++){
-            saveoffset = (offset + i *64);
-            temp = lseek(fd, saveoffset, SEEK_SET);
-            temp2 = read(fd, &empty, 1);
-            //printf("tempdir: %x\n", tempdir);
-            if(empty == 0x00)
-            {
-                found_space = 1;
-                break;
-            }
-        }
-        if(found_space)
+      for(i = 0; i * 64 < 512; i++){
+          saveoffset = (offset + i *64);
+
+          temp = lseek(fd, saveoffset, SEEK_SET);
+          temp2 = read(fd, &empty, 1);
+          //printf("tempdir: %x\n", tempdir);
+          if(empty == 0x00)
+          {
+            found_space = 1;
             break;
+          }
 
-        offset2 = fatregionstart + (4 * currDirectoryCluster);
-        temp = lseek(fd, offset2, SEEK_SET);
-        read(fd, &empty2, 4);
+      }
+      if(found_space)
+        break;
 
-        if(empty2 == 0x0FFFFFF8 || empty2 == 0x0FFFFFFF || empty2 == 0x0000000)
-        {
-            found_space = 0;
-            break;
-        }
-    } // End of While
+      offset2 = fatregionstart + (4 * currDirectoryCluster);
+      temp = lseek(fd, offset2, SEEK_SET);
+      read(fd, &empty2, 4);
 
+      if(empty2 == 0x0FFFFFF8 || empty2 == 0x0FFFFFFF || empty2 == 0x0000000)
+      {
+        found_space = 0;
+        break;
+      }
+    }
 
     DIR_ENTRY new_entry;
     int calcHiLo;
@@ -1219,114 +1220,114 @@ int create(char* name, int dirCheck, int fd, int dataRegStart, int currDirectory
 
     if(dirCheck == 1) // file
     {
-    attr = 0x20;
+      attr = 0x20;
     }
     else
     {
-    attr = 0x10;
+      attr = 0x10;
     }
     if(found_space)
     {
-        int empClus = find_empty_cluster(fd, dataRegStart);
+      int empClus = find_empty_cluster(fd, dataRegStart);
 
-        int alotofF = 0x0FFFFFFF;
+      int alotofF = 0x0FFFFFFF;
 
-        if(dirCheck == 0)
+      if(dirCheck == 0)
+      {
+        uint32_t address, addressoffset;
+
+        addressoffset = firstOffset/bpb_information.bpb_bytspersec;
+        address = (-(bpb_information.bpb_rsvdseccnt + (bpb_information.bpb_numfats*bpb_information.bpb_fatsz32))
+                  + (bpb_information.bpb_rootclus * bpb_information.bpb_secperclus) + addressoffset);
+
+        // printf("address: %x\n", address);
+        unsigned short clusHi = address >> 16;
+        unsigned short clusLo = address&0x0000FFFF;
+        pwrite(fd, &alotofF, 4, empClus);
+        uint8_t buff[512] = {0x2E, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+                                 0x20, 0x10, 0x00, 0x64, 0x04, 0x8E, 0x78, 0x4E, 0x78, 0x4E,
+                                 0x00, 0x00, 0x04, 0x8E, 0x78, 0x4E, 0xB3, 0x01, 0x00, 0x00,
+                                 0x00, 0x00, 0x2E, 0x2E, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+                                 0x20, 0x20, 0x20, 0x10, 0x00, 0x64, 0x04, 0x8E, 0x78, 0x4E,
+                                 0x78, 0x4E, clusHi&0x00FF, clusHi>>8, 0x04, 0x8E, 0x78, 0x4E, clusLo&0x00FF, clusLo>>8,
+                                 0x00, 0x00, 0x00, 0x00};
+
+        empClusNumber = (empClus-0x4000)/0x4;
+        offset = ((((empClusNumber-2) * bpb_information.bpb_secperclus) + theFirstDataSector) * bpb_information.bpb_bytspersec);
+        pwrite(fd, buff, 64, offset);
+        for(i = 0; i < 512; i++)
         {
-            unsigned int address, addressoffset;
-
-            addressoffset = firstOffset/bpb_information.bpb_bytspersec;
-            address = (-(bpb_information.bpb_rsvdseccnt + (bpb_information.bpb_numfats*bpb_information.bpb_fatsz32))
-                    + (bpb_information.bpb_rootclus * bpb_information.bpb_secperclus) + addressoffset);
-
-            printf("address: %x\n", address);
-            unsigned short clusHi = address >> 16;
-            unsigned short clusLo = address&0x0000FFFF;
-            pwrite(fd, &alotofF, 4, empClus);
-            unsigned int buff[512] = {0x2E, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
-                                    0x20, 0x10, 0x00, 0x64, 0x04, 0x8E, 0x78, 0x4E, 0x78, 0x4E,
-                                    0x00, 0x00, 0x04, 0x8E, 0x78, 0x4E, 0xB3, 0x01, 0x00, 0x00,
-                                    0x00, 0x00, 0x2E, 0x2E, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
-                                    0x20, 0x20, 0x20, 0x10, 0x00, 0x64, 0x04, 0x8E, 0x78, 0x4E,
-                                    0x78, 0x4E, clusHi&0x00FF, clusHi>>8, 0x04, 0x8E, 0x78, 0x4E, clusLo&0x00FF, clusLo>>8,
-                                    0x00, 0x00, 0x00, 0x00};
-
-            empClusNumber = (empClus-0x4000)/0x4;
-            offset = ((((empClusNumber-2) * bpb_information.bpb_secperclus) + theFirstDataSector) * bpb_information.bpb_bytspersec);
-            pwrite(fd, buff, 64, offset);
-            for(i = 0; i < 512; i++)
-            {
-            buff[i] = 0x00;
-            }
-            pwrite(fd, buff, 512-64, offset+64);
+          buff[i] = 0x00;
         }
+        pwrite(fd, buff, 512-64, offset+64);
+      }
 
-        char new_entry[64];
-        unsigned int directory[64];
-        unsigned short ClusterHi = empClusNumber >> 16;
-        unsigned short ClusterLo = empClusNumber&0x0000FFFF;
-        for (i= 0, j =0; i < 64; i++)
-        {
-            if(i < 32)
-            directory[i] = 0xFF;
-            else if(i >= 32 && i <= 32+10)
+      char new_entry[64];
+      uint8_t directory[64];
+      unsigned short ClusterHi = empClusNumber >> 16;
+      unsigned short ClusterLo = empClusNumber&0x0000FFFF;
+      for (i= 0, j =0; i < 64; i++)
+      {
+          if(i < 32)
+          directory[i] = 0xFF;
+          else if(i >= 32 && i <= 32+10)
+          {
+            directory[i] = name[j];
+            j++;
+          }
+          else if(i == 32 + 11)
+            directory[i] = attr;
+          else if(i >= 32+12 && i < 32+20)
+            directory[i] = 0x00;
+          else if(i == 32+20)
+          {
+            if(dirCheck == 0)
             {
-                directory[i] = name[j];
-                j++;
+              directory[i] = ClusterHi&0x00FF;
             }
-            else if(i == 32 + 11)
-                directory[i] = attr;
-            else if(i >= 32+12 && i < 32+20)
-                directory[i] = 0x00;
-            else if(i == 32+20)
+            else
             {
-                if(dirCheck == 0)
-                {
-                directory[i] = ClusterHi&0x00FF;
-                }
-                else
-                {
-                directory[i] = 0x00;
-                }
+              directory[i] = 0x00;
             }
-            else if(i == 32 + 21)
+          }
+          else if(i == 32 + 21)
+          {
+            if(dirCheck == 0)
             {
-                if(dirCheck == 0)
-                {
-                directory[i] = ClusterHi>>8;
-                }
-                else
-                {
-                directory[i] = 0x00;
-                }
+              directory[i] = ClusterHi>>8;
             }
-            else if(i > 32 + 21 && i < 32+26)
-                directory[i] = 0x00;
-            else if(i == 32 + 26)
+            else
             {
-                if(dirCheck == 0)
-                {
-                directory[i] = ClusterLo&0x00FF;
-                }
-                else
-                {
-                directory[i] = 0x00;
-                }
+              directory[i] = 0x00;
             }
-            else if(i == 32 + 27)
+          }
+          else if(i > 32 + 21 && i < 32+26)
+            directory[i] = 0x00;
+          else if(i == 32 + 26)
+          {
+            if(dirCheck == 0)
             {
-                if(dirCheck == 0)
-                {
-                directory[i] = ClusterLo >> 8;
-                }
-                else
-                {
-                directory[i] = 0x00;
-                }
+              directory[i] = ClusterLo&0x00FF;
             }
-            else if(i >= 32 + 28){
-                directory[i] = 0x00;
+            else
+            {
+              directory[i] = 0x00;
             }
+          }
+          else if(i == 32 + 27)
+          {
+            if(dirCheck == 0)
+            {
+              directory[i] = ClusterLo >> 8;
+            }
+            else
+            {
+              directory[i] = 0x00;
+            }
+          }
+          else if(i >= 32 + 28){
+            directory[i] = 0x00;
+          }
         }
         temp2 = pwrite(fd, directory, 64, saveoffset);
     }
@@ -1336,32 +1337,32 @@ int create(char* name, int dirCheck, int fd, int dataRegStart, int currDirectory
         int alotofF = 0x0FFFFFFF;
         if(dirCheck == 0)
         {
-        unsigned int address, addressoffset;
-        addressoffset = firstOffset/bpb_information.bpb_bytspersec;
-        printf("addressoffset: %x\n", addressoffset);
-        address = (-(bpb_information.bpb_rsvdseccnt + (bpb_information.bpb_numfats*bpb_information.bpb_fatsz32))
+          uint32_t address, addressoffset;
+          addressoffset = firstOffset/bpb_information.bpb_bytspersec;
+          // printf("addressoffset: %x\n", addressoffset);
+          address = (-(bpb_information.bpb_rsvdseccnt + (bpb_information.bpb_numfats*bpb_information.bpb_fatsz32))
                     + (bpb_information.bpb_rootclus * bpb_information.bpb_secperclus) + addressoffset);
 
-        printf("address: %x\n", address);
-        unsigned short clusHi = address >> 16;
-        unsigned short clusLo = address&0x0000FFFF;
-        pwrite(fd, &alotofF, 4, empClus);
-        unsigned int buff[512] = {0x2E, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
-                                0x20, 0x10, 0x00, 0x64, 0x04, 0x8E, 0x78, 0x4E, 0x78, 0x4E,
-                                0x00, 0x00, 0x04, 0x8E, 0x78, 0x4E, 0xB3, 0x01, 0x00, 0x00,
-                                0x00, 0x00, 0x2E, 0x2E, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
-                                0x20, 0x20, 0x20, 0x10, 0x00, 0x64, 0x04, 0x8E, 0x78, 0x4E,
-                                0x78, 0x4E, clusHi&0x00FF, clusHi>>8, 0x04, 0x8E, 0x78, 0x4E, clusLo&0x00FF, clusLo>>8,
-                                0x00, 0x00, 0x00, 0x00};
+          // printf("address: %x\n", address);
+          unsigned short clusHi = address >> 16;
+          unsigned short clusLo = address&0x0000FFFF;
+          pwrite(fd, &alotofF, 4, empClus);
+          uint8_t buff[512] = {0x2E, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+                                   0x20, 0x10, 0x00, 0x64, 0x04, 0x8E, 0x78, 0x4E, 0x78, 0x4E,
+                                   0x00, 0x00, 0x04, 0x8E, 0x78, 0x4E, 0xB3, 0x01, 0x00, 0x00,
+                                   0x00, 0x00, 0x2E, 0x2E, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+                                   0x20, 0x20, 0x20, 0x10, 0x00, 0x64, 0x04, 0x8E, 0x78, 0x4E,
+                                   0x78, 0x4E, clusHi&0x00FF, clusHi>>8, 0x04, 0x8E, 0x78, 0x4E, clusLo&0x00FF, clusLo>>8,
+                                   0x00, 0x00, 0x00, 0x00};
 
-        empClusNumber = (empClus-0x4000)/0x4;
-        offset = ((((empClusNumber-2) * bpb_information.bpb_secperclus) + theFirstDataSector) * bpb_information.bpb_bytspersec);
-        pwrite(fd, buff, 64, offset);
-        for(i = 0; i < 512; i++)
-        {
+          empClusNumber = (empClus-0x4000)/0x4;
+          offset = ((((empClusNumber-2) * bpb_information.bpb_secperclus) + theFirstDataSector) * bpb_information.bpb_bytspersec);
+          pwrite(fd, buff, 64, offset);
+          for(i = 0; i < 512; i++)
+          {
             buff[i] = 0x00;
-        }
-        pwrite(fd, buff, 512-64, offset+64);
+          }
+          pwrite(fd, buff, 512-64, offset+64);
         }
 
         int empClusNumber, offset3;
@@ -1374,67 +1375,68 @@ int create(char* name, int dirCheck, int fd, int dataRegStart, int currDirectory
 
         for (i= 0, j =0; i < 64; i++)
         {
-            if(i < 32)
-                directory[i] = 0xFF;
-            else if(i >= 32 && i <= 32+10)
+          if(i < 32)
+          directory[i] = 0xFF;
+          else if(i >= 32 && i <= 32+10)
+          {
+            directory[i] = name[j];
+            j++;
+          }
+          else if(i == 32 + 11)
+            directory[i] = attr;
+          else if(i >= 32+12 && i < 32+20)
+            directory[i] = 0x00;
+          else if(i == 32+20)
+          {
+            if(dirCheck == 0)
             {
-                directory[i] = name[j];
-                j++;
+              directory[i] = ClusterHi&0x00FF;
             }
-            else if(i == 32 + 11)
-                directory[i] = attr;
-            else if(i >= 32+12 && i < 32+20)
-                directory[i] = 0x00;
-            else if(i == 32+20)
+            else
             {
-                if(dirCheck == 0)
-                {
-                directory[i] = ClusterHi&0x00FF;
-                }
-                else
-                {
-                directory[i] = 0x00;
-                }
+              directory[i] = 0x00;
             }
-            else if(i == 32 + 21)
+          }
+          else if(i == 32 + 21)
+          {
+            if(dirCheck == 0)
             {
-                if(dirCheck == 0)
-                {
-                directory[i] = ClusterHi>>8;
-                }
-                else
-                {
-                directory[i] = 0x00;
-                }
+              directory[i] = ClusterHi>>8;
             }
-            else if(i > 32 + 21 && i < 32+26)
-                directory[i] = 0x00;
-            else if(i == 32 + 26)
+            else
             {
-                if(dirCheck == 0)
-                {
-                directory[i] = ClusterLo&0x00FF;
-                }
-                else
-                {
-                directory[i] = 0x00;
-                }
+              directory[i] = 0x00;
             }
-            else if(i == 32 + 27)
+          }
+          else if(i > 32 + 21 && i < 32+26)
+            directory[i] = 0x00;
+          else if(i == 32 + 26)
+          {
+            if(dirCheck == 0)
             {
-                if(dirCheck == 0)
-                {
-                directory[i] = ClusterLo >> 8;
-                }
-                else
-                {
-                directory[i] = 0x00;
-                }
+              directory[i] = ClusterLo&0x00FF;
             }
-            else if(i >= 32 + 28){
-                directory[i] = 0x00;
+            else
+            {
+              directory[i] = 0x00;
             }
+          }
+          else if(i == 32 + 27)
+          {
+            if(dirCheck == 0)
+            {
+              directory[i] = ClusterLo >> 8;
+            }
+            else
+            {
+              directory[i] = 0x00;
+            }
+          }
+          else if(i >= 32 + 28){
+            directory[i] = 0x00;
+          }
         }
+
         empClus = find_empty_cluster(fd, dataRegStart);
         temp = lseek(fd, empClus, SEEK_SET);
         temp2 = write(fd, &alotofF, 4);
@@ -1443,33 +1445,37 @@ int create(char* name, int dirCheck, int fd, int dataRegStart, int currDirectory
         temp2 = write(fd, &empClusNumber, 4);
         offset = ((((empClusNumber-2) * bpb_information.bpb_secperclus) + theFirstDataSector) * bpb_information.bpb_bytspersec);
         temp2 = pwrite(fd, directory, 64, offset);
+
     }
     return 0;
 }
 
 void fill_dir_entry(DIR_ENTRY* entry, int dirLoc, int fd)
-{
-    printf("begin fill_dir_entry function\n");
+{    
+    // printf("begin fill_dir_entry function\n");
     off_t temp;
     ssize_t temp2;
-    printf("before lseek\n");
+    // printf("before lseek\n");
     temp = lseek(fd, dirLoc, SEEK_SET);
-    printf("after lseek\n");
-    //grab the important data at a direntry to copy
+    // printf("after lseek\n");
+
+    // grab the important data at a direntry to copy
     temp2 = read(fd, &entry->DIR_Name, 11);
-    printf("after first read\n");
+    // printf("after first read\n");
+    
     entry->DIR_Name[10] = '\0';     //null termination
     temp2 = read(fd, &entry->DIR_Attributes, 1);
-    printf("&entry->DIR_Attributes\n");
+    
+    // printf("&entry->DIR_Attributes\n");
     temp = lseek(fd, 8, SEEK_CUR);
     temp2 = read(fd, &entry->DIR_FstClusHI, 2);
     temp = lseek(fd, 4, SEEK_CUR);
     temp2 = read(fd, &entry->DIR_FstClusLo, 2);
     temp2 = read(fd, &entry->DIR_FileSize, 4);
 
-    printf("DIR_Name: %s\nDIR_Attributes: %d\nDIR_FstClusHI: %d\nDIR_FstClusLo: %d\nDIR_FileSize: %d\n",
+    // printf("DIR_Name: %s\nDIR_Attributes: %d\nDIR_FstClusHI: %d\nDIR_FstClusLo: %d\nDIR_FileSize: %d\n",
     entry->DIR_Name, entry->DIR_Attributes, entry->DIR_FstClusHI, entry->DIR_FstClusLo, entry->DIR_FileSize);
-    printf("end fill_dir_entry function\n");
+    // printf("end fill_dir_entry function\n");
 }
 
 /*
