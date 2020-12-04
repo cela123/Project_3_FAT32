@@ -22,6 +22,13 @@ How to compile executables with Makefile
     When the makefile is run with "make" the executable "project3" will be created. The executable will launch the program. 
 
 Known bugs/unfinished project parts:
+Bugs: 
+    -When a new file is created using: creat FILE
+    It is not recognized as a file, therefore almost all other commands do not work on it
+      
+Unfinished Parts:
+    - mv only renames items in the current directory, does not mv files to a new directory
+    - rm does not recognize the last entry in a directory and sets the first bit to 0xE5 as well
      
 
 Extra credit documentation:
