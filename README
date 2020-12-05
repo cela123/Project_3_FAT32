@@ -12,8 +12,7 @@ Contents of tar archive:
     makefile - compiles all of the program files into a single executable "project3". 
 
     main.c - Prompts the user for new commands/input from the user and calls the appropriate functions based on the
-              the user's input. Shell.c also keeps track of the number of background processes and the total number
-              of commands executed since the program started. 
+             the user's input. 
 
     parser.h - Header file for parser.c
 
