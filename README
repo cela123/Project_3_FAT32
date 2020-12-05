@@ -4,6 +4,9 @@ COP4610 Project 1 - Shell Implementation
 Team Members: Aria Delmar, Alec Amico, Alvaro Reyes
 
 Division of Labor:
+    Aria: exit, info, size, ls, cd, open, close, lseek, read, write
+    Alec: info, creat, mkdir
+    Alvaro: size, mv, open, close, lseek
 
 
 Contents of tar archive:

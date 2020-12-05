@@ -56,8 +56,6 @@ struct openFiles{
 struct openFiles *head = NULL;
 struct openFiles *current = NULL;
 
-
-
 //Function Declarations
 void gather_info(int fd);
 void print_info();
@@ -73,10 +71,10 @@ int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int 
 int file_cluster_num(int fd, char fileName[11], int curDir, int firstDataLoc, int curCluster); 
 int next_cluster_num(int fd, unsigned int currentClusterNum); 
 
-int last_cluster_num(intfd, int currentClusterNum); 
+int last_cluster_num(int fd, int currentClusterNum); 
 
 int file_size(int fd, char* fileName, int curDir); 
-unsigned int find_empty_cluster(int fd); 
+unsigned int find_empty_cluster(int fd, int dataRegStart); 
 void create_dir_entry(int type); 
 
 int data_region_loc(int clusterNum); 
@@ -84,6 +82,8 @@ int data_region_loc(int clusterNum);
 void read_file(int fd, char name[11], int readSize, int); 
 
 void write_to_file(int fd, char fileName[11], int sizeOfWrite, char* stringFromInput, int curDir, int fileDataClusterNum); 
+
+int create(char* name, int dirCheck, int fd, int dataRegStart, int currDirectoryCluster);
 
 
 //MAIN STARTS
@@ -94,8 +94,12 @@ int main(int argc, char *argv[]){
     int dataRegStart; 
     int test; 
     int i, j; 
-    char fileName[11]; 
-    int empty =0; 
+    char fileName[11], tempstr[11];  
+    int empty = 0; 
+    unsigned int directory; 
+    unsigned int clusterNumber = 0; 
+    int clusterBytes = 32; 
+    int counter = 0, offset = 0; 
 
     //-------CURRENT DIRECTORY DATA-------
     int currDirectory;
@@ -145,18 +149,19 @@ int main(int argc, char *argv[]){
             }
         }
         if(strcmp(inputTokens->items[0], "ls") == 0){
-            int directory; 
-            int clusterNumber = 0; 
-            int clusterBytes = 32; 
-            int counter = 0; 
+            memset(fileName,' ',sizeof(tempstr));
+            memset(tempstr,' ',sizeof(tempstr));
+            clusterNumber = 0; 
+            clusterBytes = 32; 
+            counter = 0; 
+            j = 0;
 
             if(inputTokens->items[1]!= NULL){
-                //determine start of directory specified
-                printf("ls for a specific file\n"); 
+                //determine start of directory specified 
                 if((dir_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster)) != -1){
                         directory = (dataRegStart + 512*(( (dir_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster)) -2)*bpb_information.bpb_secperclus));
                         clusterNumber = dir_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster); 
-                        printf(".          \t"); 
+                        printf(". "); 
                         counter++; 
 
                 }
@@ -165,17 +170,11 @@ int main(int argc, char *argv[]){
                     printf("%s is not a directory\n", inputTokens->items[1]); 
                     continue; 
                 }
-                
-                //printf("directory for ls: %d\n", directory); 
             }
             else{
                 directory = currDirectory; 
                 clusterNumber = currDirectoryCluster; 
-            }      
-
-            //printf("directory: %d\n", directory); 
-            //printf("clusterNumber: %d\n", clusterNumber); 
-
+            }       
             temp = lseek(fd, directory, SEEK_SET);
             temp2 = read(fd, &empty, 4); 
 
@@ -183,24 +182,44 @@ int main(int argc, char *argv[]){
             if((currDirectory != dataRegStart) && empty != 0){
                 temp = lseek(fd, directory, SEEK_SET);
                 for(i=0; i<11; i++){
-                    temp2 = read(fd, &fileName[i], 1);            
+                    temp2 = read(fd, &tempstr[i], 1);            
                 }
-                printf("%s\t", fileName); 
+                // Removing trailing blank spaces
+                for(i = 0; i < 11; i++)
+                {
+                    if (!(tempstr[i] == ' ' && tempstr[i+1] == ' '))
+                    {
+                        fileName[j] = tempstr[i];
+                        j++;
+                    }
+                }
+                fileName[j-1] = '\0'; // one trailing blank kept showing up
+                j = 0;
+                printf("%s ", fileName); 
                 counter++; 
                 temp = lseek(fd, directory+32, SEEK_SET);
                 temp2 = read(fd, &empty, 4);
-
             }
                 
-            while(empty != 0){
-                //printf("Empty = %d\n", empty); 
+            while(empty != 0){  
                 empty = 0; 
                 temp = lseek(fd, directory+clusterBytes, SEEK_SET);
                 
                 for(i=0; i<11; i++){
-                    temp2 = read(fd, &fileName[i], 1);            
+                    temp2 = read(fd, &tempstr[i], 1);            
                 }
-                printf("%s\t", fileName); 
+                // Removing trailing blank spaces
+                for(i = 0; i < 11; i++)
+                {
+                    if (!(tempstr[i] == ' ' && tempstr[i+1] == ' '))
+                    {
+                        fileName[j] = tempstr[i];
+                        j++;
+                    }
+                }
+                fileName[j-1] = '\0'; // one trailing blank kept showing up
+                j = 0;
+                printf("%s ", fileName); 
 
                 temp = lseek(fd, 21, SEEK_CUR);
                 temp2 = read(fd, &empty, 4); 
@@ -223,7 +242,7 @@ int main(int argc, char *argv[]){
                     }   
                 }
                 counter++; 
-                if(counter == 6){
+                if(counter == 12){
                     printf("\n"); 
                     counter = 0; 
                 }
@@ -259,8 +278,6 @@ int main(int argc, char *argv[]){
         }
         if(strcmp(inputTokens->items[0], "creat") == 0){
             int newFileCluster = 0; 
-            int fatLoc = 0; 
-            unsigned int noMoreClusters = 0x0FFFFFFF; 
             
             if(inputTokens->items[1] == NULL){
                 printf("Missing operand for creat\n"); 
@@ -270,17 +287,8 @@ int main(int argc, char *argv[]){
                 printf("%s is already a file\n", inputTokens->items[1]);
                 continue; 
             }
-            //if(dir_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster))
-
             else{
-                printf("creating new file\n"); 
-                newFileCluster = find_empty_cluster(fd); 
-                fatLoc = newFileCluster*4 + (bpb_information.bpb_rsvdseccnt * bpb_information.bpb_bytspersec*bpb_information.bpb_secperclus); 
-                printf("cluster num: %d\t%x\n", newFileCluster, newFileCluster); 
-                printf("location in fat: %d\t%x\n", fatLoc, fatLoc); 
-                temp = lseek(fd, -4, SEEK_CUR);
-                
-                write(fd, &noMoreClusters, 4);
+                create(inputTokens->items[1], 1, fd, dataRegStart, currDirectoryCluster);
             }
         }
         if(strcmp(inputTokens->items[0], "mkdir") == 0){
@@ -292,8 +300,12 @@ int main(int argc, char *argv[]){
                 printf("%s is already a directory\n", inputTokens->items[1]);
                 continue; 
             }
+            else{
+                create(inputTokens->items[1], 0, fd, dataRegStart, currDirectoryCluster);
+            }
         }
         if(strcmp(inputTokens->items[0], "mv") == 0){   //mv FROM TO, [1] = FROM ,[2] = TO
+
             if(inputTokens->items[1] == NULL){
                 printf("Missing file operand\n"); 
                 continue; 
@@ -310,10 +322,59 @@ int main(int argc, char *argv[]){
                 printf("Cannot move directory: invalid destination argument\n"); 
                 continue; 
             }
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == -1)
+            {
+                printf("The File '%s' cannot be found\n", inputTokens->items[1]);
+            }
+            if(find_dir_entry(fd, inputTokens->items[2], currDirectory) == -1 && find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20){
+                memset(fileName,' ',sizeof(tempstr));
+                memset(tempstr,' ',sizeof(tempstr));
+                unsigned short space[1] = {0x20};
+                j = 0;
+                clusterBytes = 32;
+                empty = 0;
+                directory = currDirectory;
+                temp = lseek(fd, directory, SEEK_SET);
+                temp2 = read(fd, &empty, 4);
+                while(empty != 0)
+                {
+                    empty = 0;
+                    temp = lseek(fd, directory+clusterBytes, SEEK_SET);
 
-            if(find_dir_entry(fd, inputTokens->items[2], currDirectory) == -1){
-                printf("rename %s to %s\n", inputTokens->items[1], inputTokens->items[2]); 
-                //if TO does not exit, rename FROM to TO
+                    for(i=0; i<11; i++)
+                    {
+                        temp2 = read(fd, &tempstr[i], 1);
+                    }
+                    // Removing trailing blank spaces
+                    for(i = 0; i < 11; i++)
+                    {
+                        if (!(tempstr[i] == ' ' && tempstr[i+1] == ' '))
+                        {
+                            fileName[j] = tempstr[i];
+                            //tempstr[i] = inputTokens->items[2][i]; // copying replacement name into tempStr
+                            j++;
+                        }
+                    }
+                    fileName[j-1] = '\0'; // one trailing blank kept showing up
+                    j = 0;
+                    if (strcmp(fileName, inputTokens->items[1]) == 0)
+                    {
+                        temp = lseek(fd, directory+clusterBytes, SEEK_SET);
+                        // Clearing name to be changed
+                        for(i=0; i<11; i++)
+                        {
+                            temp2 = write(fd, space, 1);
+                        }
+                        temp = lseek(fd, directory+clusterBytes, SEEK_SET);
+                        // Writing name
+                        temp2 = write(fd, inputTokens->items[2], strlen(inputTokens->items[2]));
+                        break;
+                    }
+
+                    temp = lseek(fd, 21, SEEK_CUR);
+                    temp2 = read(fd, &empty, 4);
+                    clusterBytes += 64;
+                } // End of While
             }
             if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10){
                 printf("moving %s to %s\n", inputTokens->items[1], inputTokens->items[2]); 
@@ -359,8 +420,8 @@ int main(int argc, char *argv[]){
                     printf("Invalid mode for open: %s\n", inputTokens->items[2]); 
                     continue; 
                 }
-                printf("Currently open files: ");
-                printOpenFiles();                          
+                //printf("Currently open files: ");
+                //printOpenFiles();                          
             }     
         }
         if(strcmp(inputTokens->items[0], "close") == 0){    //close FILENAME
@@ -455,24 +516,16 @@ int main(int argc, char *argv[]){
                     //if OFFSET + SIZE > file size
                     if(findOpenFile(inputTokens->items[1])->Offset + readSize > file_size(fd, inputTokens->items[1], currDirectory)){
                         //read file size - OFFSET starting at OFFSET
-                        printf("having to change read size\n"); 
+                        //printf("having to change read size\n"); 
                         readSize = file_size(fd, inputTokens->items[1], currDirectory) - findOpenFile(inputTokens->items[1])->Offset; 
                     }
                     
-                    fileClusterNum = file_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster); 
-                    
+                    fileClusterNum = file_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster);                    
                     fileData = data_region_loc(fileClusterNum);
 
-                    printf("data for %s starts at %d\n", inputTokens->items[1], fileData);
+                    //printf("data for %s starts at %d\n", inputTokens->items[1], fileData);
 
-                    // char test; 
-                    // temp = lseek(fd, fileData, SEEK_SET);
-                    // temp2 = read(fd, &test, 1);
-
-                    read_file(fd, inputTokens->items[1], readSize, fileClusterNum); 
-
-                    
-
+                    read_file(fd, inputTokens->items[1], readSize, fileClusterNum);  
                 }
                 else{
                     printf("File %s is not open for reading\n", inputTokens->items[1]); 
@@ -557,14 +610,87 @@ int main(int argc, char *argv[]){
                 printf("File %s does not exist\n", inputTokens->items[1]); 
                 continue;
             } 
+            //remove:
             if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10 || find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20)  {
-                printf("Removing %s\n", inputTokens->items[1]);
+                //printf("Removing %s\n", inputTokens->items[1]);
+                memset(fileName,' ',sizeof(fileName));
+                memset(tempstr,' ',sizeof(tempstr));
+                j = 0;
+                clusterBytes = 32;
+                empty = 0;
+                unsigned short emptyCluster[4] = {0,0,0,0};
+                unsigned short E5[1] = {0xE5};
+                clusterNumber = file_cluster_num(fd, inputTokens->items[1], currDirectory, dataRegStart, currDirectoryCluster);
+                offset =  bpb_information.bpb_rsvdseccnt*bpb_information.bpb_bytspersec+clusterNumber*4;
+                
+                temp = lseek(fd, offset, SEEK_SET);
+                temp2 = read(fd, &clusterNumber, 4);
+                
+                // Clearing Clusters in Fat Region
+                if(clusterNumber > 0x0FFFFFF8)
+                {
+                    temp = lseek(fd, offset, SEEK_SET);
+                    temp2 = write(fd, emptyCluster, 4);
+                }
+                else {
+                    while(clusterNumber < 0x0FFFFFF8)
+                    {
+                        temp = lseek(fd, offset, SEEK_SET);
+                        temp2 = write(fd, emptyCluster, 4);
+                        offset = bpb_information.bpb_rsvdseccnt*bpb_information.bpb_bytspersec+clusterNumber*4;
+                        temp = lseek(fd, offset, SEEK_SET);
+                        temp2 = read(fd, &clusterNumber, 4);
+                    }
+                }
+                directory = currDirectory;
+                temp = lseek(fd, directory, SEEK_SET);
+                temp2 = read(fd, &empty, 4);
+                while(empty != 0)
+                {
+                    empty = 0;
+                    temp = lseek(fd, directory+clusterBytes, SEEK_SET);
+
+                    for(i=0; i<11; i++)
+                    {
+                        temp2 = read(fd, &tempstr[i], 1);
+                    }
+                    // Removing trailing blank spaces
+                    for(i = 0; i < 11; i++)
+                    {
+                        if (!(tempstr[i] == ' ' && tempstr[i+1] == ' '))
+                        {
+                            fileName[j] = tempstr[i];
+                            j++;
+                        }
+                    }
+                    fileName[j-1] = '\0'; // one trailing blank kept showing up
+                    j = 0;
+                    if (strcmp(fileName, inputTokens->items[1]) == 0)
+                    {
+                        break;
+                    }
+
+                    temp = lseek(fd, 21, SEEK_CUR);
+                    temp2 = read(fd, &empty, 4);
+                    clusterBytes += 64;
+                } // End of While
+                temp = lseek(fd, directory+clusterBytes-32, SEEK_SET);
+                temp2 = write(fd, E5, 1);
+                temp2 = write(fd, emptyCluster, 3); // REMEMBER THIS VALUE WAS 3
+                for (i = 0; i < 15; i++)
+                {
+                    temp2 = write(fd, emptyCluster, 4);   
+                }                
             }                      
 
         }
         if(strcmp(inputTokens->items[0], "cp") == 0){       //cp FILENAME TO
             if(inputTokens->items[1] == NULL){
-                printf("Missing file operand\n"); 
+                printf("Missing file operand\n");
+                continue; 
+            }
+            else if(strcmp(inputTokens->items[1], "-r") == 0){
+                printf("recursive copy is not an implemented command\n"); 
                 continue; 
             }
             
@@ -579,16 +705,35 @@ int main(int argc, char *argv[]){
                     continue; 
                 }
                 //create a copy of the file in current directory with name TO
-                printf("Creating copy of %s in current directory with name %s\n", inputTokens->items[1], inputTokens->items[2]); 
+                printf("Creating copy of %s in current directory with name %s is not an implemented command\n", inputTokens->items[1], inputTokens->items[2]); 
                 continue; 
             }
 
             //if TO is directory, create copy of FILENAME in TO
             if(find_dir_entry(fd, inputTokens->items[2], currDirectory) == 0x10 && find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20){
-                printf("Creating copy of %s in %s\n", inputTokens->items[1], inputTokens->items[2]); 
+                printf("Creating copy of %s in %s is not an implemented command\n", inputTokens->items[1], inputTokens->items[2]); 
             }  
         }
-        
+        if(strcmp(inputTokens->items[0], "rmdir") == 0){
+            if(inputTokens->items[1] == NULL){
+                printf("Missing directory operand\n");
+                continue; 
+            }
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) != 0x10){
+                if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20){
+                    printf("%s is not a directory\n", inputTokens->items[1]);
+                    continue;                   
+                }
+                else{
+                    printf("%s does not exist\n", inputTokens->items[1]);
+                    continue;  
+                }
+            }
+            else{
+                printf("rmdir is not an implemented command\n"); 
+                continue; 
+            }
+        }
         if(isCommand(inputTokens->items[0]) == -1){
             printf("%s is not a command\n", inputTokens->items[0]); 
         }
@@ -1094,26 +1239,26 @@ int file_size(int fd, char* fileName, int curDir){
 /*
     Function: find_empty_cluster
     Reads through the FAT until the first empty cluster is found
-    Re
 */
-unsigned int find_empty_cluster(int fd){
-    int emptyClusterNum = 0; 
-    int fatCluster = 0; 
-    off_t temp; 
+unsigned int find_empty_cluster(int fd, int dataRegStart){
+    int fatregionstart = 0x4000;    //start at fatreg
+    int clusterNumber;
+    off_t temp;
     ssize_t temp2;
-    printf("%d\n", (bpb_information.bpb_rsvdseccnt*512) + (4*bpb_information.bpb_rootclus)); 
-    temp = lseek(fd, (bpb_information.bpb_rsvdseccnt*512) + (4*bpb_information.bpb_rootclus), SEEK_SET);
-    temp2 =read(fd, &fatCluster, 4); 
+    int i = 0;
+    for (i = 0; fatregionstart + (i * 4) < dataRegStart; i++) //fatregionstart + (i * 4) for reading 4 bytes at a time starting at 0x4000
+    {
+        temp = lseek(fd, fatregionstart + (i * 4), SEEK_SET);
+        temp2 = read(fd, &clusterNumber, 4);
 
-    while(fatCluster != 0X0){
-        fatCluster = 0;     
-        temp2 =read(fd, &fatCluster, 4); 
-        emptyClusterNum++; 
-        //printf("emptuCluster: %d\n", emptyCluster); 
+        if(clusterNumber == 0x0)
+        {
+            // printf("%d\n", i);
+            return fatregionstart + (i * 4);
+        }
+
     }
-    emptyClusterNum +=2; 
-
-    return emptyClusterNum; 
+    return -1;
 }
 /*
     Function: data_region_loc
@@ -1260,5 +1405,296 @@ void write_to_file(int fd, char fileName[11], int sizeOfWrite, char* stringFromI
     }
 
 
+}
+
+int create(char* name, int dirCheck, int fd, int dataRegStart, int currDirectoryCluster){
+ int theFirstDataSector = bpb_information.bpb_rsvdseccnt + (bpb_information.bpb_numfats * bpb_information.bpb_fatsz32);
+    DIR_ENTRY * tempdir;
+    off_t temp;
+    ssize_t temp2;
+    int fatregionstart = 0x4000;
+    int empty = 0, empty2 = 0, found_space = 0, first_run = 0, i = 0, j =0;
+    int offset, offset2, clustNum, saveoffset, firstOffset;
+    
+    int oldDirectoryCluster = currDirectoryCluster;
+
+    while(1) {    //search for empty space
+
+      if(first_run == 0)
+      {
+        offset = ((((currDirectoryCluster-2) * bpb_information.bpb_secperclus) + theFirstDataSector) * bpb_information.bpb_bytspersec);
+        firstOffset = offset;
+      }
+      else
+      {
+        currDirectoryCluster = (next_cluster_num(fd, currDirectoryCluster));
+        offset = ((((currDirectoryCluster-2) * bpb_information.bpb_secperclus) + theFirstDataSector) * bpb_information.bpb_bytspersec);
+      }
+
+      first_run++;
+
+      for(i = 0; i * 64 < 512; i++){
+          saveoffset = (offset + i *64);
+
+          temp = lseek(fd, saveoffset, SEEK_SET);
+          temp2 = read(fd, &empty, 1);
+          //printf("tempdir: %x\n", tempdir);
+          if(empty == 0x00)
+          {
+            found_space = 1;
+            break;
+          }
+
+      }
+      if(found_space)
+        break;
+
+      offset2 = fatregionstart + (4 * currDirectoryCluster);
+      temp = lseek(fd, offset2, SEEK_SET);
+      read(fd, &empty2, 4);
+
+      if(empty2 == 0x0FFFFFF8 || empty2 == 0x0FFFFFFF || empty2 == 0x0000000)
+      {
+        found_space = 0;
+        break;
+      }
+    }
+
+    DIR_ENTRY new_entry;
+    int calcHiLo;
+
+    unsigned short attr;
+    int empClusNumber;
+
+    if(dirCheck == 1) // file
+    {
+      attr = 0x20;
+    }
+    else
+    {
+      attr = 0x10;
+    }
+    if(found_space)
+    {
+      int empClus = find_empty_cluster(fd, dataRegStart);
+
+      int alotofF = 0x0FFFFFFF;
+
+      if(dirCheck == 0)
+      {
+        uint32_t address, addressoffset;
+
+        addressoffset = firstOffset/bpb_information.bpb_bytspersec;
+        address = (-(bpb_information.bpb_rsvdseccnt + (bpb_information.bpb_numfats*bpb_information.bpb_fatsz32))
+                  + (bpb_information.bpb_rootclus * bpb_information.bpb_secperclus) + addressoffset);
+
+        // printf("address: %x\n", address);
+        unsigned short clusHi = address >> 16;
+        unsigned short clusLo = address&0x0000FFFF;
+        temp2 = pwrite(fd, &alotofF, 4, empClus);
+        uint8_t buff[512] = {0x2E, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+                                 0x20, 0x10, 0x00, 0x64, 0x04, 0x8E, 0x78, 0x4E, 0x78, 0x4E,
+                                 0x00, 0x00, 0x04, 0x8E, 0x78, 0x4E, 0xB3, 0x01, 0x00, 0x00,
+                                 0x00, 0x00, 0x2E, 0x2E, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+                                 0x20, 0x20, 0x20, 0x10, 0x00, 0x64, 0x04, 0x8E, 0x78, 0x4E,
+                                 0x78, 0x4E, clusHi&0x00FF, clusHi>>8, 0x04, 0x8E, 0x78, 0x4E, clusLo&0x00FF, clusLo>>8,
+                                 0x00, 0x00, 0x00, 0x00};
+
+        empClusNumber = (empClus-0x4000)/0x4;
+        offset = ((((empClusNumber-2) * bpb_information.bpb_secperclus) + theFirstDataSector) * bpb_information.bpb_bytspersec);
+        pwrite(fd, buff, 64, offset);
+        for(i = 0; i < 512; i++)
+        {
+          buff[i] = 0x00;
+        }
+        pwrite(fd, buff, 512-64, offset+64);
+      }
+
+      char new_entry[64];
+      uint8_t directory[64];
+      unsigned short ClusterHi = empClusNumber >> 16;
+      unsigned short ClusterLo = empClusNumber&0x0000FFFF;
+      for (i= 0, j =0; i < 64; i++)
+      {
+          if(i < 32)
+          directory[i] = 0xFF;
+          else if(i >= 32 && i <= 32+10)
+          {
+            directory[i] = name[j];
+            j++;
+          }
+          else if(i == 32 + 11)
+            directory[i] = attr;
+          else if(i >= 32+12 && i < 32+20)
+            directory[i] = 0x00;
+          else if(i == 32+20)
+          {
+            if(dirCheck == 0)
+            {
+              directory[i] = ClusterHi&0x00FF;
+            }
+            else
+            {
+              directory[i] = 0x00;
+            }
+          }
+          else if(i == 32 + 21)
+          {
+            if(dirCheck == 0)
+            {
+              directory[i] = ClusterHi>>8;
+            }
+            else
+            {
+              directory[i] = 0x00;
+            }
+          }
+          else if(i > 32 + 21 && i < 32+26)
+            directory[i] = 0x00;
+          else if(i == 32 + 26)
+          {
+            if(dirCheck == 0)
+            {
+              directory[i] = ClusterLo&0x00FF;
+            }
+            else
+            {
+              directory[i] = 0x00;
+            }
+          }
+          else if(i == 32 + 27)
+          {
+            if(dirCheck == 0)
+            {
+              directory[i] = ClusterLo >> 8;
+            }
+            else
+            {
+              directory[i] = 0x00;
+            }
+          }
+          else if(i >= 32 + 28){
+            directory[i] = 0x00;
+          }
+        }
+        temp2 = pwrite(fd, directory, 64, saveoffset);
+    }
+    else
+    {
+        int empClus = find_empty_cluster(fd, dataRegStart);
+        int alotofF = 0x0FFFFFFF;
+        if(dirCheck == 0)
+        {
+          uint32_t address, addressoffset;
+          addressoffset = firstOffset/bpb_information.bpb_bytspersec;
+          // printf("addressoffset: %x\n", addressoffset);
+          address = (-(bpb_information.bpb_rsvdseccnt + (bpb_information.bpb_numfats*bpb_information.bpb_fatsz32))
+                    + (bpb_information.bpb_rootclus * bpb_information.bpb_secperclus) + addressoffset);
+
+          // printf("address: %x\n", address);
+          unsigned short clusHi = address >> 16;
+          unsigned short clusLo = address&0x0000FFFF;
+          pwrite(fd, &alotofF, 4, empClus);
+          uint8_t buff[512] = {0x2E, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+                                   0x20, 0x10, 0x00, 0x64, 0x04, 0x8E, 0x78, 0x4E, 0x78, 0x4E,
+                                   0x00, 0x00, 0x04, 0x8E, 0x78, 0x4E, 0xB3, 0x01, 0x00, 0x00,
+                                   0x00, 0x00, 0x2E, 0x2E, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+                                   0x20, 0x20, 0x20, 0x10, 0x00, 0x64, 0x04, 0x8E, 0x78, 0x4E,
+                                   0x78, 0x4E, clusHi&0x00FF, clusHi>>8, 0x04, 0x8E, 0x78, 0x4E, clusLo&0x00FF, clusLo>>8,
+                                   0x00, 0x00, 0x00, 0x00};
+
+          empClusNumber = (empClus-0x4000)/0x4;
+          offset = ((((empClusNumber-2) * bpb_information.bpb_secperclus) + theFirstDataSector) * bpb_information.bpb_bytspersec);
+          pwrite(fd, buff, 64, offset);
+          for(i = 0; i < 512; i++)
+          {
+            buff[i] = 0x00;
+          }
+          pwrite(fd, buff, 512-64, offset+64);
+        }
+
+        int empClusNumber, offset3;
+        unsigned short ClusterHi = empClusNumber >> 16;
+        unsigned short ClusterLo = empClusNumber&0x0000FFFF;
+        char new_entry[64];
+        char directory[64];
+
+        empClusNumber = (empClus-0x4000)/0x4;
+
+        for (i= 0, j =0; i < 64; i++)
+        {
+          if(i < 32)
+          directory[i] = 0xFF;
+          else if(i >= 32 && i <= 32+10)
+          {
+            directory[i] = name[j];
+            j++;
+          }
+          else if(i == 32 + 11)
+            directory[i] = attr;
+          else if(i >= 32+12 && i < 32+20)
+            directory[i] = 0x00;
+          else if(i == 32+20)
+          {
+            if(dirCheck == 0)
+            {
+              directory[i] = ClusterHi&0x00FF;
+            }
+            else
+            {
+              directory[i] = 0x00;
+            }
+          }
+          else if(i == 32 + 21)
+          {
+            if(dirCheck == 0)
+            {
+              directory[i] = ClusterHi>>8;
+            }
+            else
+            {
+              directory[i] = 0x00;
+            }
+          }
+          else if(i > 32 + 21 && i < 32+26)
+            directory[i] = 0x00;
+          else if(i == 32 + 26)
+          {
+            if(dirCheck == 0)
+            {
+              directory[i] = ClusterLo&0x00FF;
+            }
+            else
+            {
+              directory[i] = 0x00;
+            }
+          }
+          else if(i == 32 + 27)
+          {
+            if(dirCheck == 0)
+            {
+              directory[i] = ClusterLo >> 8;
+            }
+            else
+            {
+              directory[i] = 0x00;
+            }
+          }
+          else if(i >= 32 + 28){
+            directory[i] = 0x00;
+          }
+        }
+
+        empClus = find_empty_cluster(fd, dataRegStart);
+        temp = lseek(fd, empClus, SEEK_SET);
+        temp2 = write(fd, &alotofF, 4);
+        offset3 = 0x4000 + (4 * oldDirectoryCluster);
+        temp = lseek(fd, offset3, SEEK_SET);
+        temp2 = write(fd, &empClusNumber, 4);
+        offset = ((((empClusNumber-2) * bpb_information.bpb_secperclus) + theFirstDataSector) * bpb_information.bpb_bytspersec);
+        temp2 = pwrite(fd, directory, 64, offset);
+
+    }
+    return 0;   
 }
 
