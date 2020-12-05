@@ -63,28 +63,19 @@ void addFile(int fc, int M, int off, char n[11]);
 struct node* deleteOpenFile(char name[11]); 
 struct openFiles* findOpenFile(char name[11]); 
 void printOpenFiles(); 
-
 int isCommand(char *); 
 int find_dir_entry(int fd, char* dirName, int curDir); 
-
 int dir_cluster_num(int fd, char dirName[11], int curDir, int firstDataLoc, int curCluster); 
 int file_cluster_num(int fd, char fileName[11], int curDir, int firstDataLoc, int curCluster); 
 int next_cluster_num(int fd, unsigned int currentClusterNum); 
-
 int last_cluster_num(int fd, int currentClusterNum); 
-
 int file_size(int fd, char* fileName, int curDir); 
 unsigned int find_empty_cluster(int fd, int dataRegStart); 
 void create_dir_entry(int type); 
-
 int data_region_loc(int clusterNum); 
-
 void read_file(int fd, char name[11], int readSize, int); 
-
 void write_to_file(int fd, char fileName[11], int sizeOfWrite, char* stringFromInput, int curDir, int fileDataClusterNum); 
-
 int create(char* name, int dirCheck, int fd, int dataRegStart, int currDirectoryCluster);
-
 
 //MAIN STARTS
 int main(int argc, char *argv[]){
@@ -119,8 +110,6 @@ int main(int argc, char *argv[]){
     //printf("Data Region Start = %d\n", dataRegStart); 
     //printf("Root Cluster = %d\n", currDirectoryCluster); 
     while(1){
-        
-
         
         printf("$ ");
         char* input = get_input();
@@ -376,7 +365,7 @@ int main(int argc, char *argv[]){
                     clusterBytes += 64;
                 } // End of While
             }
-            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10){
+            if(find_dir_entry(fd, inputTokens->items[2], currDirectory) == 0x10){
                 printf("moving %s to directory %s is not an implemented command\n", inputTokens->items[1], inputTokens->items[2]); 
                 //if TO exists and it a directory, move FROM inside TO
             }
@@ -743,6 +732,10 @@ int main(int argc, char *argv[]){
 }
 //MAIN ENDS
 
+/*
+    Function: gather_info
+    collects bpb information and stores it in the bpb struct
+*/
 void gather_info(int fd)
 {
     bpb_information.bpb_bytspersec = 0; 
@@ -765,7 +758,10 @@ void gather_info(int fd)
     temp_off_t = lseek(fd, 4, SEEK_CUR);
     temp_ssize_t = read(fd, &bpb_information.bpb_rootclus, 4);
 }
-
+/*
+    Function: print_info
+    prints the pbp info in the proper format for the "info" command
+*/
 void print_info(){
 
     printf("bpb_bytspersec: %d\nbpb_secperclus: %d\nbpb_rsvdseccnt: %d\nbpb_numfats: %d\nbpb_totsec32: %d\nbpb_fatsz32: %d\nbpb_rootclus: %d\n",
@@ -1156,7 +1152,6 @@ int next_cluster_num(int fd, unsigned int currentClusterNum){
 /*
     Function: last_cluster_num
     Returns the last cluster number for the data for the current cluster
-    
 */
 int last_cluster_num(int fd, int currentClusterNum){
     int curCluster = currentClusterNum; 
@@ -1178,7 +1173,11 @@ int last_cluster_num(int fd, int currentClusterNum){
     }
     return -1; 
 }
-
+/*
+    Function: file_size
+    Returns the size listed on the directory entry for the file specified in the current directory
+    Assumed that file is known to exist
+*/
 int file_size(int fd, char* fileName, int curDir){
     off_t temp;
     int i,j; 
@@ -1270,7 +1269,9 @@ int data_region_loc(int clusterNum){
 
 /*
     Function: read_file
-    
+    Prints to the user the desired number of bytes of information
+    from the contents of the specified file. 
+    Also updates the offset of the file as the data is read
 */
 void read_file(int fd, char fileName[11], int readSize, int fileDataClusterNum){
     off_t temp; 
@@ -1321,7 +1322,12 @@ void read_file(int fd, char fileName[11], int readSize, int fileDataClusterNum){
     //printf("read: %s\n", dataRead);  
     printf("\n");  
 }
-
+/*
+    Function: write_to_file
+    Write to the file the string provided by the user at the current
+    offset of the file. 
+    Updates the offset as data is written
+*/
 void write_to_file(int fd, char fileName[11], int sizeWrite, char* stringFromInput, int curDir, int fileDataClusterNum){
     off_t temp; 
     ssize_t temp2; 
@@ -1404,7 +1410,11 @@ void write_to_file(int fd, char fileName[11], int sizeWrite, char* stringFromInp
 
 
 }
-
+/*
+    Function: create
+    Creates a file or directory (and all the subsequent information involved) 
+    passed on the dirCheck flag (1 = file, 0 = directory)
+*/
 int create(char* name, int dirCheck, int fd, int dataRegStart, int currDirectoryCluster){
  int theFirstDataSector = bpb_information.bpb_rsvdseccnt + (bpb_information.bpb_numfats * bpb_information.bpb_fatsz32);
     DIR_ENTRY * tempdir;

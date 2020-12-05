@@ -29,19 +29,22 @@ Known bugs/unfinished project parts:
         - no known bugs
     size:
         - if size has been increased with a write, this will not be reflected
+        - fixing this would recquire implmenting a function that goes to bytes where the size of the file is specified and writing
+          over them with the new size
     ls:
-            - no known bugs
+        - no known bugs
     cd:
         - no known bugs
     creat:
         - "creat" will only create a directory entry with the appropriate filename that will show up with ls. This file 
           cannot be opened/closed and therefore cannot be read from or written to. 
+        - fixing this requires more time to be spent creating the appropriate DIRENTRY
     mkdir:
         - no known bugs
     mv:
-        - is not fully implemented
+        - is not fully implemented (explained below)
     open:
-        - file create with "creat" function cannot be opened
+        - file created with "creat" function cannot be opened
     close:
         - no known bugs
     lseek:
@@ -50,13 +53,17 @@ Known bugs/unfinished project parts:
         - no know bugs
     write:
         - the file size does not update as the file is written to
+        
         - More clusters cannot be allocated for writes that recquire them. If the write requires more clusters be allocated 
           for the file, the number of additional clusters needed will be calculated and displayed. But, the size of the write
-          will be reduced to the amount of remaining space in the file. 
+          will be reduced to the amount of remaining space in the file.
+        - implementing this woudl recquire a function to create a new cluster, change the previous reference for the end of the data
+          in the fat to a reference to the new last cluster number. If this is done appropriately the write function should function
+          appropriately with the new cluster.     
     rm:
         - does not recognize the last entry in a directory
     cp:
-        - is not fully implemented 
+        - is not fully implemented (explained below)
       
 Unfinished Parts:
     - mv only renames items in the current directory, does not mv files to a new directory
