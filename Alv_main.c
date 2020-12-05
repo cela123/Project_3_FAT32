@@ -561,7 +561,7 @@ int main(int argc, char *argv[]){
                 printf("File %s does not exist\n", inputTokens->items[1]); 
                 continue;
             } 
-            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10 || find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20)  {
+            if(find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x10 || find_dir_entry(fd, inputTokens->items[1], currDirectory) == 0x20){
                 memset(fileName,' ',sizeof(fileName));
                 memset(tempstr,' ',sizeof(tempstr));
                 j = 0;

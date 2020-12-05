@@ -1,5 +1,5 @@
 # Project_3_FAT32
-COP4610 Project 1 - Shell Implementation
+COP4610 Project 3 - Project_3_FAT32
 
 Team Members: Aria Delmar, Alec Amico, Alvaro Reyes
 
@@ -8,9 +8,8 @@ Division of Labor:
     Alec: info, creat, mkdir
     Alvaro: size, mv, open, close, lseek
 
-
 Contents of tar archive:
-    makefile - compiles all of the program files into a single executable "shell". 
+    makefile - compiles all of the program files into a single executable "project3". 
 
     main.c - Prompts the user for new commands/input from the user and calls the appropriate functions based on the
               the user's input. Shell.c also keeps track of the number of background processes and the total number
@@ -22,16 +21,49 @@ Contents of tar archive:
                tokenized. 
 
 How to compile executables with Makefile
-    When the makefile is run with "make" the executable "project3" will be created. The executable will launch the program. 
+    When the makefile is run with "make" the executable "project3" will be created. An argument should be provided for
+    the path to the image file. Ex: "project3 fat32.img" will launch the program with fat32.img as the image file to 
+    navigate.
 
-Known bugs/unfinished project parts:
-Bugs: 
-    -When a new file is created using: creat FILE
-    It is not recognized as a file, therefore almost all other commands do not work on it
+Known bugs/unfinished project parts: 
+    exit:
+        - no known bugs
+    size:
+        - if size has been increased with a write, this will not be reflected
+    ls:
+            - no known bugs
+    cd:
+        - no known bugs
+    creat:
+        - "creat" will only create a directory entry with the appropriate filename that will show up with ls. This file 
+          cannot be opened/closed and therefore cannot be read from or written to. 
+    mkdir:
+        - no known bugs
+    mv:
+        - is not fully implemented
+    open:
+        - file create with "creat" function cannot be opened
+    close:
+        - no known bugs
+    lseek:
+        - no know bugs
+    read:
+        - no know bugs
+    write:
+        - the file size does not update as the file is written to
+        - More clusters cannot be allocated for writes that recquire them. If the write requires more clusters be allocated 
+          for the file, the number of additional clusters needed will be calculated and displayed. But, the size of the write
+          will be reduced to the amount of remaining space in the file. 
+    rm:
+        - does not recognize the last entry in a directory
+    cp:
+        - is not fully implemented 
       
 Unfinished Parts:
     - mv only renames items in the current directory, does not mv files to a new directory
-    - rm does not recognize the last entry in a directory and sets the first bit to 0xE5 as well
-     
+    - rm does not recognize the last entry in a directory and sets the first bit to 0xE5 as well    
+    - cp only has error checking for the syntax of the provided command but will not actually implement any kind of copy
 
 Extra credit documentation:
+    There is some error checking for rmdir. It will check if DIRECTORY is a directory or not and if some of the necessary 
+    operands are missing. 
